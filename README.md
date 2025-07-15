@@ -93,7 +93,7 @@ You can use any LLM service for your copilot implementation. Some options includ
 
 ## Tech Stack
 
-- Next.js 15 (App Router)
+- Next.js 15
 - TypeScript
 - Tailwind CSS
 - React
