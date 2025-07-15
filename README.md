@@ -120,7 +120,7 @@ You can use any LLM service for your copilot implementation. Some options includ
 - [ ] Code builds successfully (`npm run build`)
 - [ ] Implementation follows the sample conversation flow
 - [ ] Changes are pushed to GitHub
-- [ ] Pull Request created (optional but recommended)
+- [ ] Pull Request created
 
 ---
 
