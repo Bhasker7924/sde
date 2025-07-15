@@ -46,7 +46,7 @@ Perfect! I've filled out all your information. You can review everything in the 
 
 ## 📝 Accepting the Assignment
 
-1. **Access the assignment**: https://classroom.github.com/a/Qu_7RFhw
+1. **Access the assignment**: https://classroom.github.com/a/dZ61f_Wh
 2. **Sign in to GitHub** and authorize GitHub Classroom if prompted
 3. **Click "Accept this assignment"** and wait for repository creation
 4. **Clone your repository**:
