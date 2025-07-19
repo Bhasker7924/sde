@@ -16,7 +16,9 @@ export async function POST(req: NextRequest) {
       model: 'models/gemini-1.5-pro-latest',
     });
 
-    const generationInput: any = [prompt];
+    const generationInput: any[] = [{
+      text: prompt,
+    },];
 
     if (images.length > 0) {
       generationInput.push(...images.map((image: string) => ({
