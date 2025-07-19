@@ -7,27 +7,23 @@ const openai = new OpenAI({
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
-    console.log("✅ Request Body:", body);
+    const { messages } = await req.json();
 
-    const { messages } = body;
+    // Log for debug (REMOVE later)
+    console.log("✅ API HIT: /api/llm");
+    console.log("Model used:", "gpt-3.5-turbo");
 
-    if (!messages || !Array.isArray(messages)) {
-      console.error("❌ Invalid messages format");
-      return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
-    }
-
-    const chatResponse = await openai.chat.completions.create({
-      model: "gpt-3.5-turbo",
+    const response = await openai.chat.completions.create({
+      model: "gpt-3.5-turbo", // ✅ HARDCODED TO SAFE MODEL
       messages,
     });
 
-    const reply = chatResponse.choices[0]?.message?.content;
-    console.log("✅ LLM Reply:", reply);
-
-    return NextResponse.json({ reply });
-  } catch (error: any) {
-    console.error("❌ LLM API Error:", error);
-    return NextResponse.json({ error: "LLM API failed" }, { status: 500 });
+    return NextResponse.json(response.choices[0].message);
+  } catch (err: any) {
+    console.error("❌ OpenAI Error:", err);
+    return NextResponse.json(
+      { error: err.message || "Unknown error from OpenAI" },
+      { status: 500 }
+    );
   }
 }
