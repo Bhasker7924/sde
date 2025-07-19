@@ -1,28 +1,36 @@
-import { NextResponse } from "next/server";
-import OpenAI from "openai";
+// app/api/llm/route.ts
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+import { NextResponse } from 'next/server';
+import { GoogleGenerativeAI } from '@google/generative-ai';
+
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 
 export async function POST(req: Request) {
   try {
     const { messages } = await req.json();
 
-    // Log for debug (REMOVE later)
-    console.log("✅ API HIT: /api/llm");
-    console.log("Model used:", "gpt-3.5-turbo");
+    const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
 
-    const response = await openai.chat.completions.create({
-      model: "gpt-3.5-turbo", // ✅ HARDCODED TO SAFE MODEL
-      messages,
+    const result = await model.generateContent({
+      contents: [
+        {
+          role: 'user',
+          parts: [{ text: messages?.[messages.length - 1]?.content }],
+        },
+      ],
     });
 
-    return NextResponse.json(response.choices[0].message);
+    const response = result.response;
+    const text = response.text();
+
+    return NextResponse.json({
+      role: 'assistant',
+      content: text,
+    });
   } catch (err: any) {
-    console.error("❌ OpenAI Error:", err);
+    console.error('❌ Gemini API error:', err);
     return NextResponse.json(
-      { error: err.message || "Unknown error from OpenAI" },
+      { error: 'Failed to generate response from Gemini' },
       { status: 500 }
     );
   }
