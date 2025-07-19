@@ -9,7 +9,7 @@ export async function POST(req: Request) {
   try {
     const { messages } = await req.json();
 
-    const model = genAI.getGenerativeModel({ model: 'models/gemini-1.5-pro-latest' }); 
+    const model = genAI.getGenerativeModel({ model: 'models/gemini-1.0-pro' }); // ✅ FIXED here
 
     const result = await model.generateContent({
       contents: [
