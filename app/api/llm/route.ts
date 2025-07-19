@@ -1,4 +1,4 @@
-// app/api/gemini/route.ts
+// app/api/llm/route.ts
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { NextRequest, NextResponse } from 'next/server';
 
@@ -6,31 +6,31 @@ const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY || '');
 
 export async function POST(req: NextRequest) {
   try {
-    const { prompt } = await req.json();
+    const body = await req.json();
+    const { messages } = body;
 
-    if (!prompt || typeof prompt !== 'string') {
-      return NextResponse.json({ error: 'Invalid or missing prompt' }, { status: 400 });
+    if (!messages || !Array.isArray(messages)) {
+      return NextResponse.json({ error: 'Missing messages array' }, { status: 400 });
     }
+
+    // Convert OpenAI-style messages to Gemini-style contents
+    const contents = messages.map((msg: any) => ({
+      role: msg.role,
+      parts: [{ text: msg.content }],
+    }));
 
     const model = genAI.getGenerativeModel({
       model: 'models/gemini-1.5-pro-latest',
     });
 
-    const result = await model.generateContent({
-      contents: [
-        {
-          role: 'user',
-          parts: [{ text: prompt }],
-        },
-      ],
-    });
+    const result = await model.generateContent({ contents });
+    const reply = result.response.text();
 
-    const text = result.response.text();
-    return NextResponse.json({ output: text });
-  } catch (error: any) {
-    console.error('Gemini API Error:', error);
+    return NextResponse.json({ reply });
+  } catch (err: any) {
+    console.error('Gemini Error:', err);
     return NextResponse.json(
-      { error: error?.message || 'Internal Server Error' },
+      { error: err.message || 'Internal Server Error' },
       { status: 500 }
     );
   }
