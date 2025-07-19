@@ -2,6 +2,11 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { NextRequest, NextResponse } from 'next/server';
 
+if(!process.env.GOOGLE_API_KEY){
+  throw new Error("X GOOGLE_API_KEY missing")
+}
+
+console.log(' API key Status',process.env.GOOGLW_API_KEY?'Key is present and has value' : 'Key is missing or empty')
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY || '');
 
 export async function POST(req: NextRequest) {

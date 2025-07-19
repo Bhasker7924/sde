@@ -1,8 +1,10 @@
+// app/components/FormContext.tsx
 'use client';
 
 import { createContext, useContext, useState, ReactNode } from 'react';
 
-type FormData = {
+// Make sure to export FormData
+export type FormData = { // <-- Added 'export' here
   name: string;
   email: string;
   linkedin: string;
@@ -23,7 +25,8 @@ export const FormContext = createContext<{
   formData: defaultForm,
   updateForm: () => {},
 });
-export const useFormContext = ()=> useContext(FormContext);
+
+export const useFormContext = () => useContext(FormContext);
 
 export const FormProvider = ({ children }: { children: ReactNode }) => {
   const [formData, setFormData] = useState<FormData>(defaultForm);

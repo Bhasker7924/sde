@@ -1,23 +1,28 @@
 // app/lib/llmHandler.ts
-import OpenAI from 'openai';
-import type { ChatCompletionMessageParam } from 'openai/resources/chat';
-console.log('Loaded :',process.env.OPENAI_API_KEY);
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY || "",
-});
+import { GoogleGenerativeAI } from '@google/generative-ai';
+import type { GenerateContentRequest } from '@google/generative-ai'; // For type hinting
+import type { Content } from '@google/generative-ai'; // For message history type
 
-if(!process.env.OPEN_API_KEY){
-  throw new Error("❌ OPENAI_API_KEY is missing from environment variables");
+// Use GOOGLE_API_KEY as per your previous route.ts and Vercel setup
+if (!process.env.GOOGLE_API_KEY) {
+  throw new Error('❌ GOOGLE_API_KEY is missing from environment variables. Set it in Vercel settings.');
 }
 
-export async function getLLMResponse(conversation: ChatCompletionMessageParam[]) {
+// Initialize Gemini Generative AI client
+const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
+
+export async function getLLMResponse(conversation: Content[]) {
   try {
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4o', // Change to 'gpt-3.5-turbo' if needed
-      messages: [
-        {
-          role: 'system',
-          content: `You are a smart and friendly AI Copilot helping users fill out a form with these 4 fields:
+    // Ensure the model exists and is appropriate. gemini-1.5-pro-latest or gemini-1.5-flash-latest are good choices.
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-pro-latest' });
+
+    // Construct the request payload for Gemini
+    const contents: GenerateContentRequest['contents'] = [
+      {
+        role: 'system', // Gemini uses 'system' for initial instructions for some models or setups, though 'user' is often used for prompts.
+        parts: [
+          {
+            text: `You are a smart and friendly AI Copilot helping users fill out a form with these 4 fields:
 - name
 - email
 - LinkedIn
@@ -33,29 +38,39 @@ Always return JSON format:
   }
 }
 Only include updated fields inside 'updates'. If none, return empty updates. Do not repeat fields. Always return valid JSON.`,
-        },
-        ...conversation,
-      ],
-      temperature: 0.7,
+          },
+        ],
+      },
+      ...conversation, // Spread the existing conversation history
+    ];
+
+    const result = await model.generateContent({
+      contents: contents,
+      generationConfig: {
+        temperature: 0.7,
+        // You might consider responseMimeType: "application/json" for stricter JSON output
+        // but it requires a Gemini 1.5 model and careful schema definition.
+        // For simpler cases, prompting for JSON is often sufficient.
+      },
     });
 
-    const content = response.choices[0].message.content;
+    const responseText = result.response.text();
 
     // Safely parse JSON string from LLM
     try {
-      return JSON.parse(content || '{}');
+      return JSON.parse(responseText || '{}');
     } catch (err) {
-      console.error('❌ Failed to parse response as JSON:', content);
+      console.error('❌ Failed to parse response as JSON from Gemini:', responseText);
       return {
         message: "Hmm, I had trouble understanding that. Could you say it again?",
         updates: {},
       };
     }
   } catch (err: any) {
-    console.error('🔥 OpenAI error:', err.message || err);
-    
+    console.error('🔥 Gemini API error:', err.message || err);
+
     return {
-      message: "Sorry, I'm having trouble connecting. Try again in a moment!",
+      message: "Sorry, I'm having trouble connecting to the AI. Try again in a moment!",
       updates: {},
     };
   }
