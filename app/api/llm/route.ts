@@ -70,7 +70,7 @@ Only include updated fields inside 'updates'. If none, return empty updates. Do 
 
 
     const model = genAI.getGenerativeModel({
-      model: 'models/gemini-1.5-flash-latest',
+      model: 'models/gemini-2.5-flash-lite-preview-06-17',
     });
 
     const result = await model.generateContent({
