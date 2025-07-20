@@ -14,11 +14,11 @@ type Message = {
 type LLMResponse = {
   message: string;
   updates: Partial<{
-    name?: string;
-    email?: string;
-    linkedin?: string; // We expect 'linkedin' or 'LinkedIn' from AI
-    aiIdea?: string; // We expect 'aiIdea' from the AI, then map it to 'idea'
-    LinkedIn?: string; // Fallback for AI occasionally sending 'LinkedIn'
+    name: string; // Ensure these are recognized
+    email: string;
+    linkedin: string; // AI might send this
+    aiIdea: string; // AI might send this
+    LinkedIn: string; // AI might send this (capitalized)
   }>;
 };
 
@@ -76,7 +76,8 @@ export default function Copilot() {
 
       // --- Data Normalization and Form Update Logic ---
       if (data.updates && Object.keys(data.updates).length > 0) {
-        const normalizedUpdates: Partial<FormData> = {}; // Initialize with correct type
+        // Initialize normalizedUpdates correctly to accept all potential keys from FormData
+        const normalizedUpdates: Partial<FormData> = {}; 
 
         // Normalize 'name'
         if (data.updates.name !== undefined) {
@@ -104,7 +105,6 @@ export default function Copilot() {
       }
       // --- End Data Normalization ---
 
-      // Add assistant's message to conversation
       setConversation((prev) => [
         ...prev,
         { role: 'assistant', content: data.message || 'No message from assistant.' },
@@ -235,4 +235,4 @@ export default function Copilot() {
       `}</style>
     </div>
   );
-          }
+      }
