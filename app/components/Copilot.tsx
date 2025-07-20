@@ -1,7 +1,8 @@
+// app/components/Copilot.tsx
 'use client';
 
 import { useState, useContext, useRef, useEffect } from 'react';
-import { useFormContext, FormData } from './FormContext';
+import { useFormContext, FormData } from './FormContext'; // Keep useFormContext as it's working for data updates
 
 // Type for individual messages in the conversation
 type Message = {
@@ -15,7 +16,7 @@ type LLMResponse = {
   updates: Partial<{
     name?: string;
     email?: string;
-    linkedin?: string;
+    linkedin?: string; // We expect 'linkedin' or 'LinkedIn' from AI
     aiIdea?: string; // We expect 'aiIdea' from the AI, then map it to 'idea'
     LinkedIn?: string; // Fallback for AI occasionally sending 'LinkedIn'
   }>;
@@ -29,7 +30,7 @@ export default function Copilot() {
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
   // Use the custom useFormContext hook to manage form data
-  const { formData, updateForm } = useFormContext();
+  const { updateForm } = useFormContext(); // We only need updateForm here, not formData
 
   // Ref for auto-scrolling chat to the latest message
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -39,8 +40,10 @@ export default function Copilot() {
     // Only scroll if the user is near the bottom or it's a new message
     const chatContainer = chatEndRef.current?.parentElement;
     if (chatContainer) {
-      const isScrolledToBottom = chatContainer.scrollHeight - chatContainer.clientHeight <= chatContainer.scrollTop + 50; // Add a small buffer
-      if (isScrolledToBottom || conversation.length <= 2) { // Auto-scroll for initial messages too
+      // Calculate if the user is near the bottom (within 50px of the bottom)
+      const isScrolledToBottom = chatContainer.scrollHeight - chatContainer.clientHeight <= chatContainer.scrollTop + 50;
+      // Scroll if near bottom, or if it's the very first message/initial load (to show greeting)
+      if (isScrolledToBottom || conversation.length <= 2) {
         chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
       }
     }
@@ -73,20 +76,31 @@ export default function Copilot() {
 
       // --- Data Normalization and Form Update Logic ---
       if (data.updates && Object.keys(data.updates).length > 0) {
-        const normalizedUpdates: Partial<FormData> = { ...data.updates };
+        const normalizedUpdates: Partial<FormData> = {}; // Initialize with correct type
 
+        // Normalize 'name'
+        if (data.updates.name !== undefined) {
+          normalizedUpdates.name = data.updates.name;
+        }
+        // Normalize 'email'
+        if (data.updates.email !== undefined) {
+          normalizedUpdates.email = data.updates.email;
+        }
+        // Normalize 'linkedin' or 'LinkedIn' from AI response to 'linkedinProfile' for your formData
+        if (data.updates.linkedin !== undefined) {
+          normalizedUpdates.linkedinProfile = data.updates.linkedin; // Map to linkedinProfile
+        } else if (data.updates.LinkedIn !== undefined) {
+          normalizedUpdates.linkedinProfile = data.updates.LinkedIn; // Map to linkedinProfile
+        }
         // Normalize 'aiIdea' from AI response to 'idea' for your formData
-        if (normalizedUpdates.aiIdea !== undefined) {
-          normalizedUpdates.idea = normalizedUpdates.aiIdea;
-          delete normalizedUpdates.aiIdea; // Clean up the temporary key
-        }
-        // Normalize 'LinkedIn' from AI response to 'linkedin' for your formData
-        if (normalizedUpdates.LinkedIn !== undefined) {
-          normalizedUpdates.linkedin = normalizedUpdates.LinkedIn;
-          delete normalizedUpdates.LinkedIn;
+        if (data.updates.aiIdea !== undefined) {
+          normalizedUpdates.idea = data.updates.aiIdea; // Map to idea
         }
 
-        updateForm(normalizedUpdates);
+        // Only call updateForm if there are actual updates to apply
+        if (Object.keys(normalizedUpdates).length > 0) {
+          updateForm(normalizedUpdates);
+        }
       }
       // --- End Data Normalization ---
 
@@ -108,13 +122,19 @@ export default function Copilot() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto p-6 bg-gradient-to-br from-blue-50 to-indigo-100 shadow-2xl rounded-2xl border border-blue-200 mt-10 space-y-6">
+    // The main Copilot container. Use 'h-full' and 'flex flex-col' to fill parent height
+    // and correctly structure for the chat area to grow.
+    <div className="flex flex-col h-full bg-gradient-to-br from-blue-50 to-indigo-100 shadow-2xl rounded-2xl border border-blue-200 p-6">
       <h2 className="text-3xl font-extrabold text-center text-gray-800 mb-6 flex items-center justify-center gap-2">
         <span role="img" aria-label="robot-head">🤖</span> AI Copilot
       </h2>
 
       {/* Chat messages display area */}
-      <div className="space-y-4 mb-4 max-h-[500px] min-h-[200px] overflow-y-auto p-4 border border-blue-200 rounded-lg bg-white shadow-inner scrollbar-thin scrollbar-thumb-blue-300 scrollbar-track-blue-100">
+      {/* flex-grow: This is key! It allows this div to take all available vertical space.
+          overflow-y-auto: Makes it scrollable when content overflows.
+          min-h-[200px]: Ensures it has a minimum height even with little content.
+      */}
+      <div className="flex-grow min-h-[200px] space-y-4 mb-4 overflow-y-auto p-4 border border-blue-200 rounded-lg bg-white shadow-inner scrollbar-thin scrollbar-thumb-blue-300 scrollbar-track-blue-100">
         {conversation.map((msg, idx) => (
           <div
             key={idx}
@@ -125,8 +145,8 @@ export default function Copilot() {
             <div
               className={`p-3 rounded-lg max-w-[75%] break-words shadow-md
                 ${msg.role === 'assistant'
-                  ? 'bg-blue-600 text-white rounded-tl-none' // Assistant bubbles (blue, left)
-                  : 'bg-gray-200 text-gray-800 rounded-tr-none' // User bubbles (gray, right)
+                  ? 'bg-blue-600 text-white rounded-tl-none'
+                  : 'bg-gray-200 text-gray-800 rounded-tr-none'
                 }`}
             >
               {msg.content}
@@ -146,7 +166,8 @@ export default function Copilot() {
       </div>
 
       {/* Input form */}
-      <form onSubmit={handleSubmit} className="flex gap-3 p-2 bg-white rounded-lg shadow-inner border border-blue-100">
+      {/* mt-auto: Pushes the input form to the bottom of the flex container */}
+      <form onSubmit={handleSubmit} className="flex gap-3 p-2 bg-white rounded-lg shadow-inner border border-blue-100 mt-auto">
         <input
           type="text"
           className="flex-grow px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200 text-gray-800"
@@ -172,17 +193,6 @@ export default function Copilot() {
           )}
         </button>
       </form>
-
-      {/* Display of extracted form data */}
-      <div className="mt-6 text-sm text-gray-700 space-y-2 p-5 border border-blue-200 rounded-lg bg-white shadow-lg">
-        <h3 className="font-extrabold text-xl text-gray-800 border-b pb-2 mb-3">📋 Form Data Collected</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
-          <div className="col-span-1"><strong>Name:</strong> {formData.name || '—'}</div>
-          <div className-="col-span-1"><strong>Email:</strong> {formData.email || '—'}</div>
-          <div className="col-span-1"><strong>LinkedIn:</strong> {formData.linkedin || '—'}</div>
-          <div className="col-span-1"><strong>AI Idea:</strong> {formData.idea || '—'}</div>
-        </div>
-      </div>
       {/* Basic global styles for dot animation (consider moving to global CSS) */}
       <style jsx>{`
         .dot-animation {
