@@ -12,10 +12,9 @@ if (!process.env.GOOGLE_API_KEY) {
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
 
 export async function getLLMResponse(conversation: Content[]) {
-  try {
-    // Ensure the model exists and is appropriate. gemini-1.5-pro-latest or gemini-1.5-flash-latest are good choices.
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-pro-latest' });
-
+  try
+const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash-latest' }); // <-- Change model here
+// ...
     // Construct the request payload for Gemini
     const contents: GenerateContentRequest['contents'] = [
       {
