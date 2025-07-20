@@ -79,11 +79,11 @@ export default function Copilot() {
         if (data.updates.email !== undefined) {
           updatesToApply.email = data.updates.email;
         }
-        // LinkedIn Profile (normalize from AI's 'linkedin' or 'LinkedIn' to 'linkedinProfile')
+        // LinkedIn (normalize from AI's 'linkedin' or 'LinkedIn' to 'linkedin' for FormData)
         if (data.updates.linkedin !== undefined) {
-          updatesToApply.linkedinProfile = data.updates.linkedin;
+          updatesToApply.linkedin = data.updates.linkedin; // <-- CHANGED TO 'linkedin'
         } else if (data.updates.LinkedIn !== undefined) {
-          updatesToApply.linkedinProfile = data.updates.LinkedIn;
+          updatesToApply.linkedin = data.updates.LinkedIn; // <-- CHANGED TO 'linkedin'
         }
         // AI Idea (normalize from AI's 'aiIdea' to 'idea')
         if (data.updates.aiIdea !== undefined) {
@@ -213,4 +213,4 @@ export default function Copilot() {
       `}</style>
     </div>
   );
-}
+        }
