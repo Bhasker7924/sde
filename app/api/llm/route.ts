@@ -1,13 +1,19 @@
-// app/api/llm/route.ts (or wherever your LLM endpoint is)
+// app/api/llm/route.ts
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { NextResponse } from 'next/server';
 
-type Message = { role: 'user' | 'assistant'; content: string; };
+// Type for messages, now aligned with Generative AI SDK's Content type structure
+export type Message = {
+  role: 'user' | 'assistant';
+  content: string; // Your internal display field
+  parts: { text: string }[]; // Required for LLM history/content
+};
+
 // This type should match your FormContext's FormData type for the fields that can be updated
 type LLMManagedFormData = {
   name?: string;
   email?: string;
-  linkedin?: string; // Using 'linkedin' to match your FormContext and AgentForm
+  linkedin?: string;
   idea?: string;
 };
 type LLMResponseOutput = {
@@ -16,7 +22,6 @@ type LLMResponseOutput = {
 };
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY as string);
-// Use the specific model ID for 2.5 flash lite
 const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite-preview-06-17" });
 
 export async function POST(req: Request) {
@@ -77,25 +82,19 @@ export async function POST(req: Request) {
       assistantFallbackMessage = `All details are collected! Here's what I have: Name: ${currentFormData.name}, Email: ${currentFormData.email}, LinkedIn: ${currentFormData.linkedin || 'N/A'}, Idea: ${currentFormData.idea}. Does this look correct?`;
     }
 
+    // Initialize chat session with history and system instruction
     const chat = model.startChat({
-        history: messages, // Send the conversation history
-        // Use systemInstruction for a robust system prompt
-        // Note: `systemInstruction` is available for `gemini-2.5-flash` and newer
-        // If your SDK is older or model doesn't support it, prepend to history:
-        // history: [{ role: 'system', content: systemInstructionContent }, ...messages],
+        history: messages.map(msg => ({ // Map your Message type to SDK's Content type
+          role: msg.role,
+          parts: msg.parts
+        })),
+        systemInstruction: { parts: [{ text: systemInstructionContent }] }
     });
-
-    // The LLM's response should be parsed to extract the JSON object.
-    // This often requires specific output formatting instructions in the prompt.
-    // For demonstration, let's assume the LLM correctly returns a string that ends with a JSON.
 
     const lastUserMessageContent = messages[messages.length - 1]?.content || '';
 
-    // Generate content from the model with the dynamic system instruction
-    const result = await model.generateContent({
-      contents: [{ role: 'user', parts: [{ text: lastUserMessageContent }] }], // Send only the last user message to avoid context window issues
-      systemInstruction: { parts: [{ text: systemInstructionContent }] } // Pass dynamic system instruction
-    });
+    // Send the last user message to the chat session
+    const result = await chat.sendMessage(lastUserMessageContent); // <--- Use chat.sendMessage
 
     const response = await result.response;
     const fullText = response.text();
