@@ -2,7 +2,7 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { NextResponse } from 'next/server';
 
-// Type for messages, now aligned with Generative AI SDK's Content type structure
+// Type for messages, now aligned with Google Generative AI's Content type structure
 export type Message = {
   role: 'user' | 'assistant';
   content: string; // Your internal display field
@@ -13,7 +13,7 @@ export type Message = {
 type LLMManagedFormData = {
   name?: string;
   email?: string;
-  linkedin?: string;
+  linkedin?: string; // Using 'linkedin' to match your FormContext and AgentForm
   idea?: string;
 };
 type LLMResponseOutput = {
@@ -88,13 +88,14 @@ export async function POST(req: Request) {
           role: msg.role,
           parts: msg.parts
         })),
-        systemInstruction: { parts: [{ text: systemInstructionContent }] }
+        // FIX IS HERE: systemInstruction must have a 'role' property (which is 'system')
+        systemInstruction: { role: 'system', parts: [{ text: systemInstructionContent }] }
     });
 
     const lastUserMessageContent = messages[messages.length - 1]?.content || '';
 
     // Send the last user message to the chat session
-    const result = await chat.sendMessage(lastUserMessageContent); // <--- Use chat.sendMessage
+    const result = await chat.sendMessage(lastUserMessageContent); // Use chat.sendMessage
 
     const response = await result.response;
     const fullText = response.text();
