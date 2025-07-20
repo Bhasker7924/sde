@@ -3,20 +3,21 @@
 
 import { createContext, useContext, useState, ReactNode } from 'react';
 
-// MAKE THIS FormData TYPE EXACTLY AS SHOWN BELOW
+// Make sure to export FormData
 export type FormData = {
   name: string;
   email: string;
-  linkedinProfile: string; // <-- CHANGE THIS FROM 'linkedin' to 'linkedinProfile'
+  linkedin: string; // Keep this as 'linkedin' to match AgentForm
   idea: string;
-  // REMOVE aiIdea?: string; and LinkedIn?: string; from here.
-  // These are AI response specific and should not be part of the core FormData type.
+  // REMOVE THESE TWO LINES:
+  // aiIdea?: string;
+  // LinkedIn?: string;
 };
 
 const defaultForm: FormData = {
   name: '',
   email: '',
-  linkedinProfile: '', // <-- CHANGE THIS TO 'linkedinProfile'
+  linkedin: '', // Keep this as 'linkedin' to match AgentForm
   idea: '',
 };
 
