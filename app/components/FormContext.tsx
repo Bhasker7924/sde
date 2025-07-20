@@ -3,21 +3,18 @@
 
 import { createContext, useContext, useState, ReactNode } from 'react';
 
-// Make sure to export FormData
-export type FormData = {
+// MAKE SURE 'export' IS HERE
+export type FormData = { // <--- ADD 'export' HERE
   name: string;
   email: string;
-  linkedin: string; // Keep this as 'linkedin' to match AgentForm
+  linkedin: string;
   idea: string;
-  // REMOVE THESE TWO LINES:
-  // aiIdea?: string;
-  // LinkedIn?: string;
 };
 
 const defaultForm: FormData = {
   name: '',
   email: '',
-  linkedin: '', // Keep this as 'linkedin' to match AgentForm
+  linkedin: '',
   idea: '',
 };
 
