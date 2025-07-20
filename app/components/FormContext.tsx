@@ -1,14 +1,13 @@
-// app/components/FormContext.tsx
 'use client';
 
 import { createContext, useContext, useState, ReactNode } from 'react';
 
 // Make sure to export FormData
-export type FormData = { // <-- Added 'export' here
+export type FormData = {
   name: string;
   email: string;
-  linkedin: string;
-  idea: string;
+  linkedin: string; // <-- Expect lowercase 'l' for internal consistency
+  idea: string;    // <-- Expect lowercase 'i' for internal consistency
 };
 
 const defaultForm: FormData = {
