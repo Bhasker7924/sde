@@ -61,7 +61,7 @@ export default function Copilot() {
       const res = await fetch('/api/llm', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: newMessages }), // Send the whole conversation history
+        body: JSON.stringify({ messages: newMessages, currentFormData: formData }), // Send the whole conversation history
       });
 
       if (!res.ok) {
