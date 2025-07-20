@@ -2,32 +2,26 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { NextRequest, NextResponse } from 'next/server';
 
 // Define the expected structure of the LLM's parsed JSON response
-// This matches the format you're prompting the AI to return.
 type ParsedLLMResponse = {
   message: string;
   updates: {
     name?: string;
     email?: string;
-    linkedin?: string;
-    idea?: string;
+    linkedin?: string; // Expect lowercase 'l'
+    aiIdea?: string;   // Expect camelCase 'aiIdea'
   };
 };
 
 // --- API Key Check and Initialization ---
-// This check runs when the serverless function is initialized (cold start)
 if (!process.env.GOOGLE_API_KEY) {
-  // Use a generic error message as this might happen during build or runtime init
   throw new Error('❌ GOOGLE_API_KEY is missing from environment variables. Set it in Vercel settings.');
 }
 
-// Log API key status (FIXED TYPO HERE)
 console.log(
   '🚀 API key Status:',
   process.env.GOOGLE_API_KEY ? 'Key is present and has value' : 'Key is missing or empty'
 );
 
-// Initialize Gemini Generative AI client
-// Use a fallback empty string for type safety, though the check above should prevent it from being truly empty.
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY || '');
 
 // --- POST Request Handler ---
@@ -41,23 +35,21 @@ export async function POST(req: NextRequest) {
     }
 
     // Convert OpenAI-style messages to Gemini-style contents
-    // Ensure the last message (user's latest input) is correctly formatted.
     const contents = messages.map((msg: any) => ({
-      role: msg.role === 'user' ? 'user' : 'model', // Gemini typically uses 'user'/'model' roles
+      role: msg.role === 'user' ? 'user' : 'model',
       parts: [{ text: msg.content }],
     }));
 
-    // Add the system instruction for the AI (as the first 'user' entry in the conversation context)
-    // This is crucial for guiding the model's behavior and output format.
+    // Add the system instruction for the AI, guiding its behavior and output format.
     const systemInstruction = {
-        role: 'user', // System instructions are often put as a 'user' message followed by model's understanding
+        role: 'user',
         parts: [
           {
             text: `You are a smart and friendly AI Copilot helping users fill out a form with these 4 fields:
 - name
 - email
-- LinkedIn
-- AI idea
+- linkedin (as 'linkedin')
+- AI idea (as 'aiIdea')
 
 Extract values directly from conversation. If the user says "Hi this is Priya", extract name: "Priya". Only enter the value, not the entire sentence.
 Reply naturally but only once with things like "Nice to meet you."
@@ -65,7 +57,10 @@ Always return JSON format:
 {
   "message": "Thanks! What's your email?",
   "updates": {
-    "name": "Priya"
+    "name": "Priya",
+    "email": "priya@example.com",
+    "linkedin": "https://linkedin.com/in/priya",
+    "aiIdea": "A system for personalized learning paths"
   }
 }
 Only include updated fields inside 'updates'. If none, return empty updates. Do not repeat fields. Always return valid JSON.`,
@@ -74,35 +69,27 @@ Only include updated fields inside 'updates'. If none, return empty updates. Do 
       };
 
 
-    // Get the Generative Model instance (using Flash as intended)
     const model = genAI.getGenerativeModel({
-      model: 'models/gemini-1.5-flash-latest', // Use the Flash model
+      model: 'models/gemini-1.5-flash-latest',
     });
 
-    // Send the system instruction followed by the actual conversation history
     const result = await model.generateContent({
       contents: [systemInstruction, ...contents],
       generationConfig: {
         temperature: 0.7,
-        responseMimeType: "application/json", // <-- ADDED THIS LINE FOR STRICT JSON OUTPUT
+        responseMimeType: "application/json", // Strict JSON output
       },
     });
 
-    // Extract the raw text response from Gemini
-    // With responseMimeType: "application/json", this should now *always* be valid JSON
-    // or an error will be thrown by the API call itself.
     const rawReplyText = result.response.text();
 
-    // --- Safely Parse JSON Response from LLM ---
-    // The markdown extraction logic is now less critical but harmless to keep,
-    // in case the model sometimes deviates despite mimeType (unlikely but safe).
+    // The markdown extraction is less critical with responseMimeType but harmless to keep.
     let jsonString = rawReplyText;
     const jsonMatch = rawReplyText.match(/```json\n([\s\S]*?)\n```/);
 
     if (jsonMatch && jsonMatch[1]) {
       jsonString = jsonMatch[1];
     } else {
-      // This warning should now ideally not appear if responseMimeType is working.
       console.warn("Gemini response not wrapped in ```json``` (despite mimeType), attempting to parse as is:", rawReplyText);
     }
 
@@ -119,14 +106,11 @@ Only include updated fields inside 'updates'. If none, return empty updates. Do 
       }
 
     } catch (parseError: any) {
-      // This catch should ideally not be hit with responseMimeType: "application/json"
-      // unless the model sends empty response or some other very malformed output.
       console.error('❌ Failed to parse final JSON string:', jsonString, parseError);
       parsedData.message = "I'm having trouble understanding the AI's format. Please try again.";
       parsedData.updates = {};
     }
 
-    // --- Return Response in Frontend Expected Format ---
     return NextResponse.json({
       message: parsedData.message,
       updates: parsedData.updates || {},
@@ -135,8 +119,6 @@ Only include updated fields inside 'updates'. If none, return empty updates. Do 
   } catch (err: any) {
     console.error('🔥 Gemini API or Server Error:', err.message || err);
 
-    // If responseMimeType: "application/json" causes the API to throw an error,
-    // that error will be caught here. Check `err.message` for details.
     return NextResponse.json(
       {
         error: err.message || 'Internal Server Error',
@@ -146,4 +128,4 @@ Only include updated fields inside 'updates'. If none, return empty updates. Do 
       { status: 500 }
     );
   }
-    }
+}
