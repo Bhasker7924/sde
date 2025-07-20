@@ -15,7 +15,7 @@ export async function getLLMResponse(conversation: Content[]) {
   try{
 // app/lib/llmHandler.ts
 // ...
-const modelName = 'gemini-1.5-flash-latest'; // Or from a variable
+const modelName = 'gemini-2.5-flash-lite-preview-06-17'; // Or from a variable
 console.log(`[DEBUG] Using Gemini Model: ${modelName} at ${new Date().toISOString()}`);
 const model = genAI.getGenerativeModel({ model: modelName });
 // ...
