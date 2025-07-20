@@ -1,23 +1,25 @@
-// app/components/Copilot.tsx - This is the code from my PREVIOUS attempt to fix the error.
-// Ensure this is what you have in your file.
+// app/components/Copilot.tsx
 'use client';
 
 import { useState, useContext, useRef, useEffect } from 'react';
-import { useFormContext, FormData } from './FormContext';
+import { useFormContext, FormData } from './FormContext'; // Ensure FormData is imported
 
+// Type for individual messages in the conversation
 type Message = {
   role: 'user' | 'assistant';
   content: string;
 };
 
+// Define the shape of the LLM response we expect from the backend
+// Keep 'linkedin', 'aiIdea', 'LinkedIn' here as they are what the AI sends
 type LLMResponse = {
   message: string;
   updates: Partial<{
     name: string;
     email: string;
-    linkedin: string;
-    aiIdea: string;
-    LinkedIn: string;
+    linkedin: string; // AI might send this (lowercase 'l')
+    aiIdea: string; // AI might send this
+    LinkedIn: string; // AI might send this (capitalized 'L')
   }>;
 };
 
@@ -67,26 +69,30 @@ export default function Copilot() {
       const data: LLMResponse = await res.json();
 
       if (data.updates && Object.keys(data.updates).length > 0) {
-        // This is the line that was changed and should have fixed it
-        const normalizedUpdates = {} as Partial<FormData>;
+        const updatesToApply: Partial<FormData> = {};
 
+        // Name
         if (data.updates.name !== undefined) {
-          normalizedUpdates.name = data.updates.name;
+          updatesToApply.name = data.updates.name;
         }
+        // Email
         if (data.updates.email !== undefined) {
-          normalizedUpdates.email = data.updates.email;
+          updatesToApply.email = data.updates.email;
         }
+        // LinkedIn Profile (normalize from AI's 'linkedin' or 'LinkedIn' to 'linkedinProfile')
         if (data.updates.linkedin !== undefined) {
-          normalizedUpdates.linkedinProfile = data.updates.linkedin;
+          updatesToApply.linkedinProfile = data.updates.linkedin;
         } else if (data.updates.LinkedIn !== undefined) {
-          normalizedUpdates.linkedinProfile = data.updates.LinkedIn;
+          updatesToApply.linkedinProfile = data.updates.LinkedIn;
         }
+        // AI Idea (normalize from AI's 'aiIdea' to 'idea')
         if (data.updates.aiIdea !== undefined) {
-          normalizedUpdates.idea = data.updates.aiIdea;
+          updatesToApply.idea = data.updates.aiIdea;
         }
 
-        if (Object.keys(normalizedUpdates).length > 0) {
-          updateForm(normalizedUpdates);
+        // Only update if there are actual fields to change
+        if (Object.keys(updatesToApply).length > 0) {
+          updateForm(updatesToApply);
         }
       }
 
@@ -207,4 +213,4 @@ export default function Copilot() {
       `}</style>
     </div>
   );
-                        }
+}
