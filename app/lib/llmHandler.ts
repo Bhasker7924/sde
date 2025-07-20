@@ -13,7 +13,11 @@ const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
 
 export async function getLLMResponse(conversation: Content[]) {
   try{
-const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash-latest' }); // <-- Change model here
+// app/lib/llmHandler.ts
+// ...
+const modelName = 'gemini-1.5-flash-latest'; // Or from a variable
+console.log(`[DEBUG] Using Gemini Model: ${modelName} at ${new Date().toISOString()}`);
+const model = genAI.getGenerativeModel({ model: modelName });
 // ...
     // Construct the request payload for Gemini
     const contents: GenerateContentRequest['contents'] = [
