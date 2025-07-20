@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
     }));
 
     const model = genAI.getGenerativeModel({
-      model: 'models/gemini-1.5-pro-latest',
+      model: 'models/gemini-1.5-flash-latest',
     });
 
     const result = await model.generateContent({ contents });
