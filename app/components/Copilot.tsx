@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useContext, useRef, useEffect } from 'react';
-import { useFormContext, FormData } from './FormContext'; // Keep useFormContext as it's working for data updates
+import { useFormContext, FormData } from './FormContext';
 
 // Type for individual messages in the conversation
 type Message = {
@@ -14,11 +14,11 @@ type Message = {
 type LLMResponse = {
   message: string;
   updates: Partial<{
-    name: string; // Ensure these are recognized
+    name: string;
     email: string;
-    linkedin: string; // AI might send this
-    aiIdea: string; // AI might send this
-    LinkedIn: string; // AI might send this (capitalized)
+    linkedin: string;
+    aiIdea: string;
+    LinkedIn: string;
   }>;
 };
 
@@ -29,20 +29,14 @@ export default function Copilot() {
   ]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
-  // Use the custom useFormContext hook to manage form data
-  const { updateForm } = useFormContext(); // We only need updateForm here, not formData
+  const { updateForm } = useFormContext();
 
-  // Ref for auto-scrolling chat to the latest message
   const chatEndRef = useRef<HTMLDivElement>(null);
 
-  // Effect to scroll to the bottom of the chat when conversation updates
   useEffect(() => {
-    // Only scroll if the user is near the bottom or it's a new message
     const chatContainer = chatEndRef.current?.parentElement;
     if (chatContainer) {
-      // Calculate if the user is near the bottom (within 50px of the bottom)
       const isScrolledToBottom = chatContainer.scrollHeight - chatContainer.clientHeight <= chatContainer.scrollTop + 50;
-      // Scroll if near bottom, or if it's the very first message/initial load (to show greeting)
       if (isScrolledToBottom || conversation.length <= 2) {
         chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
       }
@@ -53,7 +47,6 @@ export default function Copilot() {
     e.preventDefault();
     if (!input.trim()) return;
 
-    // Add user's message to conversation
     const userMessage: Message = { role: 'user', content: input };
     const newMessages: Message[] = [...conversation, userMessage];
     setConversation(newMessages);
@@ -64,7 +57,7 @@ export default function Copilot() {
       const res = await fetch('/api/llm', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: newMessages }), // Send the whole conversation history
+        body: JSON.stringify({ messages: newMessages }),
       });
 
       if (!res.ok) {
@@ -74,36 +67,29 @@ export default function Copilot() {
 
       const data: LLMResponse = await res.json();
 
-      // --- Data Normalization and Form Update Logic ---
       if (data.updates && Object.keys(data.updates).length > 0) {
-        // Initialize normalizedUpdates correctly to accept all potential keys from FormData
-        const normalizedUpdates: Partial<FormData> = {}; 
+        // Corrected line: Initialize with a type assertion
+        const normalizedUpdates = {} as Partial<FormData>;
 
-        // Normalize 'name'
         if (data.updates.name !== undefined) {
           normalizedUpdates.name = data.updates.name;
         }
-        // Normalize 'email'
         if (data.updates.email !== undefined) {
           normalizedUpdates.email = data.updates.email;
         }
-        // Normalize 'linkedin' or 'LinkedIn' from AI response to 'linkedinProfile' for your formData
         if (data.updates.linkedin !== undefined) {
-          normalizedUpdates.linkedinProfile = data.updates.linkedin; // Map to linkedinProfile
+          normalizedUpdates.linkedinProfile = data.updates.linkedin;
         } else if (data.updates.LinkedIn !== undefined) {
-          normalizedUpdates.linkedinProfile = data.updates.LinkedIn; // Map to linkedinProfile
+          normalizedUpdates.linkedinProfile = data.updates.LinkedIn;
         }
-        // Normalize 'aiIdea' from AI response to 'idea' for your formData
         if (data.updates.aiIdea !== undefined) {
-          normalizedUpdates.idea = data.updates.aiIdea; // Map to idea
+          normalizedUpdates.idea = data.updates.aiIdea;
         }
 
-        // Only call updateForm if there are actual updates to apply
         if (Object.keys(normalizedUpdates).length > 0) {
           updateForm(normalizedUpdates);
         }
       }
-      // --- End Data Normalization ---
 
       setConversation((prev) => [
         ...prev,
@@ -122,18 +108,11 @@ export default function Copilot() {
   };
 
   return (
-    // The main Copilot container. Use 'h-full' and 'flex flex-col' to fill parent height
-    // and correctly structure for the chat area to grow.
     <div className="flex flex-col h-full bg-gradient-to-br from-blue-50 to-indigo-100 shadow-2xl rounded-2xl border border-blue-200 p-6">
       <h2 className="text-3xl font-extrabold text-center text-gray-800 mb-6 flex items-center justify-center gap-2">
         <span role="img" aria-label="robot-head">🤖</span> AI Copilot
       </h2>
 
-      {/* Chat messages display area */}
-      {/* flex-grow: This is key! It allows this div to take all available vertical space.
-          overflow-y-auto: Makes it scrollable when content overflows.
-          min-h-[200px]: Ensures it has a minimum height even with little content.
-      */}
       <div className="flex-grow min-h-[200px] space-y-4 mb-4 overflow-y-auto p-4 border border-blue-200 rounded-lg bg-white shadow-inner scrollbar-thin scrollbar-thumb-blue-300 scrollbar-track-blue-100">
         {conversation.map((msg, idx) => (
           <div
@@ -153,7 +132,6 @@ export default function Copilot() {
             </div>
           </div>
         ))}
-        {/* Loading indicator */}
         {isLoading && (
           <div className="flex justify-start">
             <div className="p-3 rounded-lg bg-blue-100 text-blue-800 text-sm animate-pulse max-w-[75%] shadow-md">
@@ -161,12 +139,9 @@ export default function Copilot() {
             </div>
           </div>
         )}
-        {/* Empty div for auto-scrolling */}
         <div ref={chatEndRef} />
       </div>
 
-      {/* Input form */}
-      {/* mt-auto: Pushes the input form to the bottom of the flex container */}
       <form onSubmit={handleSubmit} className="flex gap-3 p-2 bg-white rounded-lg shadow-inner border border-blue-100 mt-auto">
         <input
           type="text"
@@ -193,7 +168,6 @@ export default function Copilot() {
           )}
         </button>
       </form>
-      {/* Basic global styles for dot animation (consider moving to global CSS) */}
       <style jsx>{`
         .dot-animation {
           display: inline-block;
@@ -215,10 +189,9 @@ export default function Copilot() {
             opacity: 1;
           }
         }
-        /* Custom scrollbar for better appearance */
         .scrollbar-thin {
           scrollbar-width: thin;
-          scrollbar-color: #60a5fa #dbeafe; /* thumb color track color */
+          scrollbar-color: #60a5fa #dbeafe;
         }
         .scrollbar-thin::-webkit-scrollbar {
           width: 8px;
