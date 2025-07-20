@@ -82,20 +82,29 @@ export async function POST(req: Request) {
       assistantFallbackMessage = `All details are collected! Here's what I have: Name: ${currentFormData.name}, Email: ${currentFormData.email}, LinkedIn: ${currentFormData.linkedin || 'N/A'}, Idea: ${currentFormData.idea}. Does this look correct?`;
     }
 
-    // Initialize chat session with history and system instruction
+    // Filter out initial assistant messages if they appear first in the history
+    // The Gemini API requires the first message in 'history' to be from 'user'.
+    const filteredHistory = messages.filter((msg, index) => {
+        // If it's the very first message in the array and it's an assistant message, exclude it.
+        if (index === 0 && msg.role === 'assistant') {
+            return false;
+        }
+        return true;
+    });
+
+    // Initialize chat session with filtered history and system instruction
     const chat = model.startChat({
-        history: messages.map(msg => ({ // Map your Message type to SDK's Content type
+        history: filteredHistory.map(msg => ({ // Use filteredHistory here
           role: msg.role,
           parts: msg.parts
         })),
-        // FIX IS HERE: systemInstruction must have a 'role' property (which is 'system')
         systemInstruction: { role: 'system', parts: [{ text: systemInstructionContent }] }
     });
 
     const lastUserMessageContent = messages[messages.length - 1]?.content || '';
 
     // Send the last user message to the chat session
-    const result = await chat.sendMessage(lastUserMessageContent); // Use chat.sendMessage
+    const result = await chat.sendMessage(lastUserMessageContent);
 
     const response = await result.response;
     const fullText = response.text();
@@ -136,4 +145,4 @@ export async function POST(req: Request) {
       { status: error.response?.status || 500 }
     );
   }
-}
+      }
