@@ -1,16 +1,15 @@
-// app/components/Copilot.tsx
+// app/components/Copilot.tsx - This is the code from my PREVIOUS attempt to fix the error.
+// Ensure this is what you have in your file.
 'use client';
 
 import { useState, useContext, useRef, useEffect } from 'react';
 import { useFormContext, FormData } from './FormContext';
 
-// Type for individual messages in the conversation
 type Message = {
   role: 'user' | 'assistant';
   content: string;
 };
 
-// Define the shape of the LLM response we expect from the backend
 type LLMResponse = {
   message: string;
   updates: Partial<{
@@ -68,7 +67,7 @@ export default function Copilot() {
       const data: LLMResponse = await res.json();
 
       if (data.updates && Object.keys(data.updates).length > 0) {
-        // Corrected line: Initialize with a type assertion
+        // This is the line that was changed and should have fixed it
         const normalizedUpdates = {} as Partial<FormData>;
 
         if (data.updates.name !== undefined) {
@@ -208,4 +207,4 @@ export default function Copilot() {
       `}</style>
     </div>
   );
-      }
+                        }
