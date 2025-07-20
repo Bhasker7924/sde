@@ -9,7 +9,8 @@ export type FormData = {
   email: string;
   linkedin: string;
   idea: string;
-  aiIdea?: string; // <-- ADD THIS LINE
+  aiIdea?: string; // This was correctly added for 'aiIdea'
+  LinkedIn?: string; // <-- ADD THIS LINE for 'LinkedIn'
 };
 
 const defaultForm: FormData = {
