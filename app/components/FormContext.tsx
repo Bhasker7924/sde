@@ -2,12 +2,13 @@
 
 import { createContext, useContext, useState, ReactNode } from 'react';
 
-type FormData = {
+
+export interface FormData {
   name: string;
   email: string;
   linkedin: string;
   aiIdea: string;
-};
+}
 
 type FormContextType = {
   formData: FormData;
