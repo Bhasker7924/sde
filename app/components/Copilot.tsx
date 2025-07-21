@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { useFormContext } from '../context/FormContext';
+import { useFormContext } from './FormContext';
 import { callGeminiAPI } from '../lib/llmHandler';
 
 type ChatMessage = {
