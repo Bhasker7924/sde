@@ -7,7 +7,7 @@ if (!process.env.GOOGLE_API_KEY) {
 }
 
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
-const MODEL = 'gemini-1.5-flash-latest';
+const MODEL = 'gemini-2.5-flash-lite-preview-06-17';
 const FORM_FIELDS = ['name', 'email', 'linkedin', 'aiIdea'] as const;
 
 type FormState = {
