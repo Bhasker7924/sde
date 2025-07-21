@@ -1,5 +1,5 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { FormData } from '../components/FormContext';
+import { FormData } from './FormContext';
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 
