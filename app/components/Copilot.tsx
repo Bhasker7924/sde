@@ -1,84 +1,98 @@
-const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
-  if (!input.trim()) return;
+'use client';
 
-  // Add user message
-  setConversation(prev => [...prev, { role: 'user', content: input }]);
-  setInput('');
-  setIsLoading(true);
+import { useEffect, useRef, useState } from 'react';
+import { useFormContext } from './FormContext';
+import { callGeminiAPI } from '../lib/llmHandler';
 
-  // 🔒 Guard: Already filled + reviewing? Stop LLM call
-  if (reviewMode || allFieldsFilled()) {
+export default function Copilot() {
+  const { formData, updateForm } = useFormContext();
+  const [conversation, setConversation] = useState([
+    { role: 'ai', content: 'Hi! I’m your AI Copilot. Tell me about yourself and your AI idea.' },
+  ]);
+  const [input, setInput] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const bottomRef = useRef<HTMLDivElement>(null);
+
+  const allFieldsFilled = formData.name && formData.email && formData.linkedin && formData.idea;
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [conversation]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!input.trim()) return;
+
+    // Show user input
+    setConversation((prev) => [...prev, { role: 'user', content: input }]);
+
+    setIsLoading(true);
+    const response = await callGeminiAPI(input, formData);
     setIsLoading(false);
 
-    // 🔁 Allow user to say "edit email" or similar
-    const inputLower = input.toLowerCase();
-    if (inputLower.includes('edit') || inputLower.includes('change')) {
-      const field = ['name', 'email', 'linkedin', 'idea'].find(f => inputLower.includes(f));
-      if (field) {
-        setReviewMode(false); // Go back to edit mode
-        setConversation(prev => [
-          ...prev,
-          {
-            role: 'assistant',
-            content: `Sure, please enter the new ${field}:`,
-          },
-        ]);
-      } else {
-        setConversation(prev => [
-          ...prev,
-          {
-            role: 'assistant',
-            content: `Sorry, I didn’t catch which field you want to edit. You can say "edit name", "change LinkedIn", etc.`,
-          },
-        ]);
-      }
-    } else {
-      setConversation(prev => [
-        ...prev,
-        {
-          role: 'assistant',
-          content: `If everything looks good, you can now submit the form. Or type "edit" to make changes.`,
-        },
-      ]);
-    }
-    return;
-  }
-
-  try {
-    const response = await fetch('/api/route', {
-      method: 'POST',
-      body: JSON.stringify({
-        messages: [...conversation, { role: 'user', content: input }],
-        formData,
-      }),
-    });
-
-    const data: LLMResponse = await response.json();
-
-    // Apply updates
-    if (data.updates) {
-      updateForm(data.updates);
+    // Update form if fields found
+    if (response?.updates) {
+      updateForm(response.updates);
     }
 
-    setConversation(prev => [...prev, { role: 'assistant', content: data.message }]);
-
-    // ✅ Check again after response: If all fields filled, show review
-    const filled = {
-      ...formData,
-      ...data.updates,
-    };
-
-    if (filled.name && filled.email && filled.linkedin && filled.idea) {
-      setTimeout(() => {
-        setReviewMode(true);
-        const summary = `✅ Here's what I captured:\n\n- Name: ${filled.name}\n- Email: ${filled.email}\n- LinkedIn: ${filled.linkedin}\n- AI Idea: ${filled.idea}\n\nWould you like to edit any field? Just say "edit name", "change email", etc.`;
-        setConversation(prev => [...prev, { role: 'assistant', content: summary }]);
-      }, 300);
+    // Show AI response
+    if (response?.message) {
+      setConversation((prev) => [...prev, { role: 'ai', content: response.message }]);
     }
-  } catch (err) {
-    setConversation(prev => [...prev, { role: 'assistant', content: 'Sorry, something went wrong.' }]);
-  } finally {
-    setIsLoading(false);
-  }
-};
+
+    setInput('');
+  };
+
+  useEffect(() => {
+    if (allFieldsFilled) {
+      const summary = `
+✅ Here's what I’ve got:
+- Name: ${formData.name}
+- Email: ${formData.email}
+- LinkedIn: ${formData.linkedin}
+- AI Idea: ${formData.idea}
+
+Would you like to edit anything?`;
+      setConversation((prev) => {
+        const alreadySummarized = prev.some((msg) =>
+          msg.content?.includes("Here's what I’ve got")
+        );
+        if (!alreadySummarized) {
+          return [...prev, { role: 'ai', content: summary }];
+        }
+        return prev;
+      });
+    }
+  }, [formData]);
+
+  return (
+    <div className="bg-gray-100 p-4 rounded shadow max-w-xl mx-auto h-[80vh] flex flex-col">
+      <div className="flex-1 overflow-y-auto space-y-2">
+        {conversation.map((msg, i) => (
+          <div key={i} className={`p-3 rounded ${msg.role === 'ai' ? 'bg-white text-black' : 'bg-blue-600 text-white self-end'}`}>
+            {msg.content}
+          </div>
+        ))}
+        {isLoading && (
+          <div className="p-3 bg-white rounded text-gray-600 italic">Typing...</div>
+        )}
+        <div ref={bottomRef} />
+      </div>
+
+      <form onSubmit={handleSubmit} className="mt-4 flex">
+        <input
+          className="flex-1 border rounded p-2 mr-2"
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          placeholder="Type your message..."
+        />
+        <button
+          type="submit"
+          className="bg-blue-600 text-white px-4 py-2 rounded"
+        >
+          Send
+        </button>
+      </form>
+    </div>
+  );
+}
