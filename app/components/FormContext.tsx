@@ -3,7 +3,7 @@
 
 import React, { createContext, useContext, useState, ReactNode } from 'react';
 
-type FormData = {
+export type FormData = {
   name: string;
   email: string;
   linkedin: string;
