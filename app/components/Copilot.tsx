@@ -33,8 +33,13 @@ const Copilot = () => {
     setInput('');
     setIsLoading(true);
 
-    const fieldUpdates = await callGeminiAPI(newHistory);
-    updateForm(fieldUpdates);
+    const fieldUpdates = await callGeminiAPI(
+  newHistory.map(msg => ({
+    role: msg.role === 'assistant' ? 'model' : msg.role,
+    parts: [{ text: msg.parts }],
+  }))
+);
+
 
     const filledAfterUpdate =
       (fieldUpdates.name || name) &&
