@@ -55,7 +55,9 @@ Return only updated fields as JSON like:
 `;
 
     try {
-      const response = await callGeminiAPI(prompt);
+      const response = await callGeminiAPI([
+  { role: 'user', parts: prompt }
+]);
 
       const match = response.match(/```json([\s\S]*?)```/);
       const jsonString = match ? match[1] : response;
