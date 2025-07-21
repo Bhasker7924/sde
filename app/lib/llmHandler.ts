@@ -53,7 +53,7 @@ export async function callGeminiAPI(
     }));
 
     const result = await model.generateContent([
-      { parts: [SYSTEM_PROMPT] }, // no role
+      { role: 'user', parts: [SYSTEM_PROMPT] },
       ...formattedMessages,
     ]);
 
