@@ -29,7 +29,8 @@ export default function AgentForm() {
         className="w-full border border-gray-300 p-2 rounded"
         placeholder="Describe your AI Agent idea"
         rows={4}
-        value={formData.idea}
+        value={formData.aiIdea}
+onChange={(e) => updateForm({ aiIdea: e.target.value })}
         onChange={(e) => updateForm({ idea: e.target.value })}
       />
       <button
