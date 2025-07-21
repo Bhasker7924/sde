@@ -10,7 +10,7 @@ type Message = {
 };
 
 const Copilot = () => {
-  const { formData, updateFormData } = useFormContext();
+  const { form, updateFormData } = useFormContext();
   const [messages, setMessages] = useState<Message[]>([
     { role: 'bot', content: 'Hi! I\'m your AI assistant. Tell me about yourself and your AI agent idea!' },
   ]);
@@ -24,7 +24,7 @@ const Copilot = () => {
   };
 
   const allFieldsFilled = () =>
-    formData.name && formData.email && formData.linkedin && formData.aiIdea;
+    form.name && form.email && form.linkedin && form.aiIdea;
 
   const extractFields = (text: string) => {
     const nameMatch = text.match(/(?:my name is|i am|this is)\s+([A-Z][a-z]+(?:\s[A-Z][a-z]+)?)/i);
