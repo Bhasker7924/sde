@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useFormContext } from './FormContext';
 import { callGeminiAPI } from '../lib/llmHandler';
 
@@ -9,135 +9,121 @@ type ChatMessage = {
   parts: string;
 };
 
-const Copilot = () => {
-  const { name, email, linkedin, aiIdea, updateForm } = useFormContext();
+export default function CopilotUI() {
+  const [messages, setMessages] = useState<ChatMessage[]>([
+    {
+      role: 'assistant',
+      parts: 'Hi! I’m your AI Copilot. Tell me about yourself and your AI idea.',
+    },
+  ]);
   const [input, setInput] = useState('');
-  const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [showReview, setShowReview] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const { form, updateForm } = useFormContext();
+  const chatEndRef = useRef<HTMLDivElement>(null);
 
-  const allFilled = name && email && linkedin && aiIdea;
+  const scrollToBottom = () => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
 
   useEffect(() => {
-    if (containerRef.current) {
-      containerRef.current.scrollTop = containerRef.current.scrollHeight;
-    }
-  }, [chatHistory, isLoading]);
+    scrollToBottom();
+  }, [messages]);
 
   const handleSend = async () => {
     if (!input.trim()) return;
-    const userMessage: ChatMessage = { role: 'user', parts: input };
-    const newHistory = [...chatHistory, userMessage];
-    setChatHistory(newHistory);
+
+    const newUserMessage: ChatMessage = { role: 'user', parts: input };
+    const newHistory = [...messages, newUserMessage];
+    setMessages(newHistory);
     setInput('');
     setIsLoading(true);
 
-    const fieldUpdates = await callGeminiAPI(
-  newHistory.map(msg => ({
-    role: msg.role === 'assistant' ? 'model' : msg.role,
-    parts: [{ text: msg.parts }],
-  }))
-);
+    try {
+      const fieldUpdates = await callGeminiAPI(
+        newHistory.map((msg) => ({
+          role: msg.role === 'assistant' ? 'model' : 'user',
+          parts: [{ text: msg.parts }],
+        }))
+      );
 
+      updateForm(fieldUpdates);
 
-    const filledAfterUpdate =
-      (fieldUpdates.name || name) &&
-      (fieldUpdates.email || email) &&
-      (fieldUpdates.linkedin || linkedin) &&
-      (fieldUpdates.aiIdea || aiIdea);
+      const filledFields = Object.entries(fieldUpdates)
+        .filter(([, value]) => value)
+        .map(([key, value]) => `${key}: ${value}`)
+        .join('\n');
 
-    if (filledAfterUpdate) {
-      setShowReview(true);
-      setIsLoading(false);
-      setChatHistory([
-        ...newHistory,
+      const allFilled =
+        fieldUpdates.name &&
+        fieldUpdates.email &&
+        fieldUpdates.linkedin &&
+        fieldUpdates.aiIdea;
+
+      const botReply = allFilled
+        ? `Great! Here’s what I got:\n\n${filledFields}\n\nLet me know if you'd like to edit anything.`
+        : 'Got it. Tell me more or continue filling in the details.';
+
+      setMessages((prev) => [
+        ...prev,
+        { role: 'assistant', parts: botReply },
+      ]);
+    } catch (error) {
+      console.error('Error calling Gemini API:', error);
+      setMessages((prev) => [
+        ...prev,
         {
           role: 'assistant',
-          parts:
-            "Thanks! Here's what I’ve got:\n\n" +
-            `👤 Name: ${fieldUpdates.name || name}\n` +
-            `📧 Email: ${fieldUpdates.email || email}\n` +
-            `🔗 LinkedIn: ${fieldUpdates.linkedin || linkedin}\n` +
-            `💡 AI Idea: ${fieldUpdates.aiIdea || aiIdea}\n\n` +
-            'Would you like to edit anything?',
+          parts: 'Sorry, something went wrong while processing your input.',
         },
       ]);
-    } else {
-      const assistantMsg = generateFollowUpMessage(fieldUpdates);
-      setChatHistory([
-        ...newHistory,
-        {
-          role: 'assistant',
-          parts: assistantMsg,
-        },
-      ]);
+    } finally {
       setIsLoading(false);
     }
   };
 
-  const generateFollowUpMessage = (fields: Partial<{ name: string; email: string; linkedin: string; aiIdea: string }>) => {
-
-    const remaining = [];
-    if (!(fields.name || name)) remaining.push('your name');
-    if (!(fields.email || email)) remaining.push('your email');
-    if (!(fields.linkedin || linkedin)) remaining.push('your LinkedIn profile');
-    if (!(fields.aiIdea || aiIdea)) remaining.push('your AI idea');
-
-    if (remaining.length === 0) return 'Got it!';
-    return `Thanks! Can you also provide ${remaining.join(', ')}?`;
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
   };
 
   return (
-    <div className="p-4 rounded-xl border bg-white shadow-xl max-w-xl mx-auto mt-6">
-      <div
-        ref={containerRef}
-        className="h-[300px] overflow-y-auto mb-4 p-2 border rounded bg-gray-50 text-black"
-      >
-        {chatHistory.map((msg, idx) => (
+    <div className="bg-gray-100 rounded-xl shadow p-4 max-w-xl w-full mx-auto mt-6">
+      <div className="h-96 overflow-y-auto space-y-4 p-2 bg-white rounded-md border">
+        {messages.map((msg, index) => (
           <div
-            key={idx}
-            className={`mb-2 whitespace-pre-wrap ${
-              msg.role === 'user' ? 'text-blue-700 font-semibold' : 'text-gray-800'
-            }`}
+            key={index}
+            className={`${
+              msg.role === 'assistant' ? 'text-gray-900' : 'text-blue-700'
+            } whitespace-pre-wrap`}
           >
-            <strong>{msg.role === 'user' ? 'You' : 'Copilot'}:</strong> {msg.parts}
+            <strong>{msg.role === 'assistant' ? '🤖 Copilot' : '🧑 You'}:</strong>{' '}
+            {msg.parts}
           </div>
         ))}
-        {isLoading && <div className="text-sm text-gray-500 italic">Copilot is typing...</div>}
+        {isLoading && (
+          <div className="text-gray-500 italic animate-pulse">Typing...</div>
+        )}
+        <div ref={chatEndRef} />
       </div>
-
-      <div className="flex space-x-2">
-        <input
-          className="flex-1 border px-3 py-2 rounded bg-white text-black"
-          placeholder="Talk to your AI copilot..."
+      <div className="mt-4 flex">
+        <textarea
+          className="flex-1 rounded-md border p-2 resize-none"
+          rows={2}
+          placeholder="Type your message..."
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') handleSend();
-          }}
+          onKeyDown={handleKeyDown}
         />
         <button
-          className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
           onClick={handleSend}
+          disabled={isLoading}
+          className="ml-2 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 disabled:opacity-50"
         >
           Send
         </button>
       </div>
-
-      {showReview && allFilled && (
-        <div className="mt-6 p-4 bg-green-100 border border-green-300 rounded text-black">
-          <h2 className="text-lg font-semibold mb-2">✅ Review your submission</h2>
-          <p><strong>👤 Name:</strong> {name}</p>
-          <p><strong>📧 Email:</strong> {email}</p>
-          <p><strong>🔗 LinkedIn:</strong> {linkedin}</p>
-          <p><strong>💡 AI Idea:</strong> {aiIdea}</p>
-          <p className="mt-2">If you'd like to edit anything, just say so!</p>
-        </div>
-      )}
     </div>
   );
-};
-
-export default Copilot;
-        
+}
