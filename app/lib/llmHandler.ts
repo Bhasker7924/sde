@@ -43,17 +43,24 @@ export async function callGeminiAPI(
   try {
     const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
 
+    // Properly format each message to fit Content[]
     const formattedMessages = messages.map((msg) => ({
       role: msg.role,
       parts: [{ text: msg.parts }],
     }));
 
-    const result = await model.generateContent([
-      { role: 'user', parts: [{ text: SYSTEM_PROMPT }] },
+    // Now prepend the system prompt as a user message
+    const chatHistory = [
+      {
+        role: 'user',
+        parts: [{ text: SYSTEM_PROMPT }],
+      },
       ...formattedMessages,
-    ]);
+    ];
 
+    const result = await model.generateContent(chatHistory);
     const response = await result.response.text();
+
     return extractFieldsFromResponse(response);
   } catch (error) {
     console.error('Gemini API Error:', error);
