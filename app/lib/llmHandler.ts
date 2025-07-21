@@ -1,42 +1,54 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
-import { ChatMessage } from "@/types";
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
-// ✅ FIX: Get API key from environment variable
-const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY || "");
+const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY || '');
 
-export async function callGeminiAPI(chatHistory: ChatMessage[]) {
-  if (!process.env.GOOGLE_API_KEY) {
-    throw new Error("GOOGLE_API_KEY is missing from environment variables.");
-  }
+if (!process.env.GOOGLE_API_KEY) {
+  throw new Error('GOOGLE_API_KEY is missing from environment variables.');
+}
 
-  const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+const SYSTEM_PROMPT = `You are a helpful assistant helping the user fill out a form with 4 fields:
+- name (just their first name, e.g. "Bhasker")
+- email
+- linkedin (a full LinkedIn URL)
+- aiIdea (a short sentence idea for an AI agent)
 
-  const result = await model.generateContent({
-    contents: chatHistory.map((msg) => ({ role: msg.role, parts: [msg.parts] })),
-    generationConfig: {
-      temperature: 0.6,
-    },
-  });
+Extract any fields the user mentions in plain language and return them.`;
 
-  const response = await result.response;
-  const text = await response.text();
+type ChatMessage = {
+  role: 'user' | 'assistant';
+  parts: string;
+};
 
-  // Try to parse key-value pairs from Gemini's response
-  const updates: Partial<Record<"name" | "email" | "linkedin" | "aiIdea", string>> = {};
+export async function callGeminiAPI(chatHistory: ChatMessage[]): Promise<Partial<{
+  name: string;
+  email: string;
+  linkedin: string;
+  aiIdea: string;
+}>> {
+  const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
 
-  const lower = text.toLowerCase();
+  const formattedMessages = chatHistory.map(msg => ({
+    role: msg.role,
+    parts: [{ text: msg.parts }],
+  }));
 
-  const nameMatch = text.match(/name[:\-\s]+([a-zA-Z ]{2,})/i);
-  if (nameMatch) updates.name = nameMatch[1].trim();
+  const result = await model.generateContent([
+    { role: 'user', parts: [{ text: SYSTEM_PROMPT }] },
+    ...formattedMessages,
+  ]);
 
-  const emailMatch = text.match(/[\w.-]+@[\w.-]+\.[a-zA-Z]{2,}/);
-  if (emailMatch) updates.email = emailMatch[0].trim();
+  const text = result.response.text();
 
-  const linkedinMatch = text.match(/https?:\/\/[\w./-]*linkedin\.com\/[\w./-]+/);
-  if (linkedinMatch) updates.linkedin = linkedinMatch[0].trim();
+  // Simple regex extraction
+  const extract = (label: string, regex: RegExp) => {
+    const match = text.match(regex);
+    return match?.[1]?.trim() || '';
+  };
 
-  const ideaMatch = text.match(/idea[:\-\s]+([\s\S]+)/i);
-  if (ideaMatch) updates.aiIdea = ideaMatch[1].trim();
-
-  return updates;
+  return {
+    name: extract('name', /(?:name\s*[:\-]?\s*)([A-Z][a-z]+)\b/),
+    email: extract('email', /([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/),
+    linkedin: extract('linkedin', /(https?:\/\/(www\.)?linkedin\.com\/[^\s]+)/i),
+    aiIdea: extract('idea', /(?:idea\s*[:\-]?\s*)(.+)/i),
+  };
 }
