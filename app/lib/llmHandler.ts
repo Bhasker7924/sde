@@ -1,79 +1,75 @@
 // app/lib/llmHandler.ts
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import type { GenerateContentRequest } from '@google/generative-ai'; // For type hinting
-import type { Content } from '@google/generative-ai'; // For message history type
+import type { Content } from '@google/generative-ai';
 
-// Use GOOGLE_API_KEY as per your previous route.ts and Vercel setup
 if (!process.env.GOOGLE_API_KEY) {
-  throw new Error('❌ GOOGLE_API_KEY is missing from environment variables. Set it in Vercel settings.');
+  throw new Error('❌ GOOGLE_API_KEY is required in .env.local');
 }
 
-// Initialize Gemini Generative AI client
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
+const MODEL = 'gemini-1.5-flash-latest';
+const FORM_FIELDS = ['name', 'email', 'linkedin', 'aiIdea'] as const;
 
-export async function getLLMResponse(conversation: Content[]) {
-  try{
-// app/lib/llmHandler.ts
-// ...
-const modelName = 'gemini-2.5-flash-lite-preview-06-17'; // Or from a variable
-console.log(`[DEBUG] Using Gemini Model: ${modelName} at ${new Date().toISOString()}`);
-const model = genAI.getGenerativeModel({ model: modelName });
-// ...
-    // Construct the request payload for Gemini
-    const contents: GenerateContentRequest['contents'] = [
-      {
-        role: 'system', // Gemini uses 'system' for initial instructions for some models or setups, though 'user' is often used for prompts.
-        parts: [
-          {
-            text: `You are a smart and friendly AI Copilot helping users fill out a form with these 4 fields:
-- name
-- email
-- LinkedIn
-- AI idea
+type FormState = {
+  name?: string;
+  email?: string;
+  linkedin?: string;
+  aiIdea?: string;
+};
 
-Extract values directly from conversation. If the user says "Hi this is Priya", extract name: "Priya". Only enter the value, not the entire sentence. 
-Reply naturally but only once with things like "Nice to meet you."
-Always return JSON format:
+export async function getLLMResponse(
+  conversation: Content[],
+  currentForm: FormState
+) {
+  try {
+    const model = genAI.getGenerativeModel({ model: MODEL });
+
+    const systemPrompt = `
+You are a helpful Copilot. The form fields are ${FORM_FIELDS.join(', ')}.
+Current filled fields: ${JSON.stringify(currentForm)}.
+Only ask for one missing field at a time in natural language.
+Validate email format and LinkedIn URL format. Always return JSON:
 {
-  "message": "Thanks! What's your email?",
-  "updates": {
-    "name": "Priya"
-  }
+ "message": "...",
+ "updates": { <field>: "<value>" }
 }
-Only include updated fields inside 'updates'. If none, return empty updates. Do not repeat fields. Always return valid JSON.`,
-          },
-        ],
-      },
-      ...conversation, // Spread the existing conversation history
+`;
+
+    const contents: Content[] = [
+      { role: 'user', parts: [{ text: systemPrompt }] },
+      ...conversation,
     ];
 
-    const result = await model.generateContent({
-      contents: contents,
-      generationConfig: {
-        temperature: 0.7,
-        // You might consider responseMimeType: "application/json" for stricter JSON output
-        // but it requires a Gemini 1.5 model and careful schema definition.
-        // For simpler cases, prompting for JSON is often sufficient.
-      },
-    });
+    const resp = await model.generateContent({ contents, generationConfig: { maxOutputTokens: 256 } });
+    const text = resp.response.text().trim();
 
-    const responseText = result.response.text();
-
-    // Safely parse JSON string from LLM
+    let parsed;
     try {
-      return JSON.parse(responseText || '{}');
-    } catch (err) {
-      console.error('❌ Failed to parse response as JSON from Gemini:', responseText);
+      parsed = JSON.parse(text);
+      if (!parsed.message || typeof parsed.updates !== 'object') throw new Error();
+    } catch {
+      console.error('Invalid JSON from Gemini:', text);
       return {
-        message: "Hmm, I had trouble understanding that. Could you say it again?",
+        message: "Sorry, I didn't understand that. Could you rephrase?",
         updates: {},
       };
     }
-  } catch (err: any) {
-    console.error('🔥 Gemini API error:', err.message || err);
 
+    // Validate email if updated
+    if (parsed.updates.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(parsed.updates.email)) {
+      return { message: "That doesn't look like a valid email. Try again.", updates: {} };
+    }
+
+    // Validate LinkedIn if updated
+    if (parsed.updates.linkedin && !parsed.updates.linkedin.startsWith('http')) {
+      return { message: "Please provide a valid LinkedIn URL (starting with https://).", updates: {} };
+    }
+
+    return parsed;
+  } catch (err: any) {
+    console.error('Gemini API error:', err);
     return {
-      message: "Sorry, I'm having trouble connecting to the AI. Try again in a moment!",
+      message: "Oops, something went wrong. Try again in a moment.",
       updates: {},
     };
   }
