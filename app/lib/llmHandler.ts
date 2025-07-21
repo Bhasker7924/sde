@@ -1,8 +1,12 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { FormData } from '../components/FormContext';
 
-// Set your Gemini API key securely in .env.local as GEMINI_API_KEY
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+const apiKey = process.env.GEMINI_API_KEY;
+if (!apiKey) {
+  throw new Error('GEMINI_API_KEY is not defined in environment variables');
+}
+
+const genAI = new GoogleGenerativeAI(apiKey);
 
 const SYSTEM_PROMPT = `
 You are a helpful assistant designed to extract four fields from user input:
