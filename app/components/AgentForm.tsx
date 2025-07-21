@@ -2,7 +2,7 @@
 'use client';
 
 import React from 'react';
-import { useFormContext } from '../context/FormContext';
+import { useFormContext } from './FormContext';
 
 export default function AgentForm() {
   const { formData, updateForm } = useFormContext();
