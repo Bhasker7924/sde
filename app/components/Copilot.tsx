@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { useFormContext } from '@/components/FormContext';
-import { callGeminiAPI } from '@/lib/llmHandler';
+import { useFormContext } from './FormContext';
+import { callGeminiAPI } from '../lib/llmHandler';
 
 interface Message {
   sender: 'user' | 'bot';
