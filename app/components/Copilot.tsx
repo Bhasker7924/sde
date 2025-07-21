@@ -1,128 +1,153 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useFormContext } from './FormContext';
 import { callGeminiAPI } from '../lib/llmHandler';
 
-type Message = {
-  sender: 'user' | 'bot';
-  text: string;
-};
+interface Message {
+  role: 'user' | 'assistant';
+  content: string;
+}
 
-export default function Copilot() {
+const Copilot = () => {
   const { formData, updateForm } = useFormContext();
   const [messages, setMessages] = useState<Message[]>([
-    { sender: 'bot', text: 'Hi! I’m your AI Copilot. Tell me about yourself and your AI idea.' },
+    {
+      role: 'assistant',
+      content: 'Hi! I’m your AI Copilot 🤖. I’ll help you fill this form. Tell me a bit about yourself.',
+    },
   ]);
   const [input, setInput] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const [loading, setLoading] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const allFieldsFilled = Object.values(formData).every((val) => val.trim() !== '');
-
-  const scrollToBottom = () => {
-    scrollRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
-
+  // Scroll to bottom on new message
   useEffect(() => {
-    scrollToBottom();
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const handleUserMessage = async () => {
+  // Check if all 4 fields are filled
+  const isFormComplete = () =>
+    formData.name && formData.email && formData.linkedin && formData.aiIdea;
+
+  // Format filled fields for review
+  const formatReview = () => {
+    return `Here's what I've got:
+- 👤 Name: ${formData.name}
+- 📧 Email: ${formData.email}
+- 🔗 LinkedIn: ${formData.linkedin}
+- 💡 AI Idea: ${formData.aiIdea}
+
+Would you like to edit any of these?`;
+  };
+
+  const handleSend = async () => {
     if (!input.trim()) return;
 
-    const userMessage = input.trim();
-    setMessages((prev) => [...prev, { sender: 'user', text: userMessage }]);
+    const userMessage: Message = { role: 'user', content: input };
+    const updatedMessages = [...messages, userMessage];
+    setMessages(updatedMessages);
     setInput('');
-    setIsLoading(true);
-
-    const prompt = `
-Given this message: "${userMessage}"
-Extract or update any of the following fields if mentioned:
-- Name
-- Email
-- LinkedIn
-- AI Idea
-
-Current values: 
-Name: ${formData.name || 'N/A'}
-Email: ${formData.email || 'N/A'}
-LinkedIn: ${formData.linkedin || 'N/A'}
-AI Idea: ${formData.aiIdea || 'N/A'}
-
-Return only updated fields as JSON like:
-{"name": "John", "email": "john@email.com"}
-`;
+    setLoading(true);
 
     try {
-      const response = await callGeminiAPI([
-  { role: 'user', parts: prompt }
-]);
+      const llmMessages = updatedMessages.map((msg) => ({
+        role: msg.role,
+        parts: msg.content,
+      }));
 
-      const match = response.match(/```json([\s\S]*?)```/);
-      const jsonString = match ? match[1] : response;
+      const updates = await callGeminiAPI(llmMessages);
 
-      const updates = JSON.parse(jsonString);
-      updateForm(updates);
+      if (Object.keys(updates).length > 0) {
+        updateForm(updates);
+      }
 
-      const botMessage = getBotResponse({ ...formData, ...updates });
-      setMessages((prev) => [...prev, { sender: 'bot', text: botMessage }]);
-    } catch (err) {
-      console.error(err);
-      setMessages((prev) => [...prev, { sender: 'bot', text: "Sorry, I couldn't process that." }]);
+      let botReply = '';
+
+      if (!isFormComplete()) {
+        const missing = [];
+        if (!formData.name && !updates.name) missing.push('name');
+        if (!formData.email && !updates.email) missing.push('email');
+        if (!formData.linkedin && !updates.linkedin) missing.push('LinkedIn');
+        if (!formData.aiIdea && !updates.aiIdea) missing.push('AI idea');
+
+        if (missing.length) {
+          botReply = `Thanks! Could you tell me your ${missing[0]}?`;
+        } else {
+          botReply = `Thanks!`;
+        }
+      } else {
+        if (input.toLowerCase().includes('edit')) {
+          botReply = `Sure! Let me know which field you'd like to update (name, email, LinkedIn, or AI idea).`;
+        } else {
+          botReply = formatReview();
+        }
+      }
+
+      setMessages([...updatedMessages, { role: 'assistant', content: botReply }]);
+    } catch (error) {
+      setMessages([
+        ...updatedMessages,
+        {
+          role: 'assistant',
+          content: 'Oops! Something went wrong. Please try again.',
+        },
+      ]);
+    } finally {
+      setLoading(false);
     }
-
-    setIsLoading(false);
   };
 
-  const getBotResponse = (data: typeof formData) => {
-    if (!allFieldsFilled) {
-      const missing = Object.entries(data)
-        .filter(([, val]) => !val.trim())
-        .map(([key]) => key)
-        .join(', ');
-      return `Thanks! Could you also tell me your ${missing}?`;
-    } else {
-      return `Thanks! Here's what I got:\n\n- Name: ${data.name}\n- Email: ${data.email}\n- LinkedIn: ${data.linkedin}\n- AI Idea: ${data.aiIdea}\n\nLet me know if you'd like to edit any field.`;
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
     }
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') handleUserMessage();
   };
 
   return (
-    <div className="w-full max-w-2xl mx-auto p-4 bg-gray-100 rounded-xl shadow-md text-black">
-      <h2 className="text-xl font-bold mb-4">🤖 AI Copilot</h2>
-      <div className="space-y-2 max-h-[400px] overflow-y-auto mb-4">
+    <div className="w-full max-w-xl mx-auto mt-6 bg-white rounded-2xl shadow p-4">
+      <h2 className="text-xl font-bold mb-2 text-black">AI Copilot 🤖</h2>
+      <div className="h-96 overflow-y-auto space-y-2 bg-gray-100 p-3 rounded">
         {messages.map((msg, idx) => (
           <div
             key={idx}
-            className={`p-3 rounded-lg whitespace-pre-line ${
-              msg.sender === 'user' ? 'bg-blue-100 text-right ml-10' : 'bg-white mr-10'
+            className={`p-2 rounded-xl max-w-[80%] whitespace-pre-wrap ${
+              msg.role === 'user'
+                ? 'bg-blue-500 text-white self-end ml-auto'
+                : 'bg-gray-300 text-black'
             }`}
           >
-            {msg.text}
+            {msg.content}
           </div>
         ))}
-        <div ref={scrollRef} />
+        {loading && (
+          <div className="p-2 bg-gray-300 text-black rounded-xl inline-block animate-pulse">
+            Thinking...
+          </div>
+        )}
+        <div ref={messagesEndRef} />
       </div>
-      <div className="flex gap-2">
-        <input
-          className="flex-1 px-3 py-2 rounded border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400"
-          placeholder="Type something..."
+      <div className="mt-4 flex items-center gap-2">
+        <textarea
+          className="flex-grow p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400"
+          rows={2}
+          placeholder="Type your message..."
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
         />
         <button
-          onClick={handleUserMessage}
-          disabled={isLoading}
-          className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 disabled:opacity-50"
+          onClick={handleSend}
+          disabled={loading}
+          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
         >
-          {isLoading ? '...' : 'Send'}
+          Send
         </button>
       </div>
     </div>
   );
-      }
+};
+
+export default Copilot;
+          
