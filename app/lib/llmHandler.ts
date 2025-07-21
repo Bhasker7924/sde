@@ -1,54 +1,62 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { FormData } from '../components/FormContext';
 
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY || '');
 
-if (!process.env.GOOGLE_API_KEY) {
-  throw new Error('GOOGLE_API_KEY is missing from environment variables.');
+const SYSTEM_PROMPT = `
+You are a helpful assistant designed to extract four fields from user input:
+- name
+- email
+- linkedin
+- aiIdea
+
+Use this JSON format only:
+{
+  "name": "",
+  "email": "",
+  "linkedin": "",
+  "aiIdea": ""
+}
+Only update fields the user explicitly mentions.
+`;
+
+function extractFieldsFromResponse(text: string): Partial<FormData> {
+  try {
+    const jsonMatch = text.match(/{[\s\S]*}/);
+    if (!jsonMatch) return {};
+    const parsed = JSON.parse(jsonMatch[0]);
+    return {
+      name: parsed.name || '',
+      email: parsed.email || '',
+      linkedin: parsed.linkedin || '',
+      aiIdea: parsed.aiIdea || '',
+    };
+  } catch (err) {
+    console.error('Error parsing Gemini output:', err);
+    return {};
+  }
 }
 
-const SYSTEM_PROMPT = `You are a helpful assistant helping the user fill out a form with 4 fields:
-- name (just their first name, e.g. "Bhasker")
-- email
-- linkedin (a full LinkedIn URL)
-- aiIdea (a short sentence idea for an AI agent)
+export async function callGeminiAPI(
+  messages: { role: 'user' | 'model'; parts: string }[]
+): Promise<Partial<FormData>> {
+  try {
+    const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
 
-Extract any fields the user mentions in plain language and return them.`;
+    const formattedMessages = messages.map((msg) => ({
+      role: msg.role,
+      parts: [{ text: msg.parts }],
+    }));
 
-type ChatMessage = {
-  role: 'user' | 'assistant';
-  parts: string;
-};
+    const result = await model.generateContent([
+      { role: 'user', parts: [{ text: SYSTEM_PROMPT }] },
+      ...formattedMessages,
+    ]);
 
-export async function callGeminiAPI(chatHistory: ChatMessage[]): Promise<Partial<{
-  name: string;
-  email: string;
-  linkedin: string;
-  aiIdea: string;
-}>> {
-  const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
-
-  const formattedMessages = chatHistory.map(msg => ({
-    role: msg.role,
-    parts: [{ text: msg.parts }],
-  }));
-
-  const result = await model.generateContent([
-    { role: 'user', parts: [{ text: SYSTEM_PROMPT }] },
-    ...formattedMessages,
-  ]);
-
-  const text = result.response.text();
-
-  // Simple regex extraction
-  const extract = (label: string, regex: RegExp) => {
-    const match = text.match(regex);
-    return match?.[1]?.trim() || '';
-  };
-
-  return {
-    name: extract('name', /(?:name\s*[:\-]?\s*)([A-Z][a-z]+)\b/),
-    email: extract('email', /([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/),
-    linkedin: extract('linkedin', /(https?:\/\/(www\.)?linkedin\.com\/[^\s]+)/i),
-    aiIdea: extract('idea', /(?:idea\s*[:\-]?\s*)(.+)/i),
-  };
+    const response = await result.response.text();
+    return extractFieldsFromResponse(response);
+  } catch (error) {
+    console.error('Gemini API Error:', error);
+    return {};
+  }
 }
