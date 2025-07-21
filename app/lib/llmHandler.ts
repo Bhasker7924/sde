@@ -1,57 +1,42 @@
-// app/lib/llmHandler.ts
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenerativeAI } from "@google/generative-ai";
+import { ChatMessage } from "@/types";
 
-const genAI = new GoogleGenerativeAI(process.env.NEXT_PUBLIC_GEMINI_API_KEY!);
+// ✅ FIX: Get API key from environment variable
+const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY || "");
 
-export const callGeminiAPI = async (messages: { role: 'user' | 'assistant'; parts: string }[]) => {
-  const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
+export async function callGeminiAPI(chatHistory: ChatMessage[]) {
+  if (!process.env.GOOGLE_API_KEY) {
+    throw new Error("GOOGLE_API_KEY is missing from environment variables.");
+  }
 
-  const formattedMessages = messages.map((msg) => ({
-    role: msg.role,
-    parts: [{ text: msg.parts }],
-  }));
+  const model = genAI.getGenerativeModel({ model: "gemini-pro" });
 
   const result = await model.generateContent({
-    contents: [
-      {
-        role: 'user',
-        parts: [{ text: SYSTEM_PROMPT }],
-      },
-      ...formattedMessages,
-    ],
+    contents: chatHistory.map((msg) => ({ role: msg.role, parts: [msg.parts] })),
+    generationConfig: {
+      temperature: 0.6,
+    },
   });
 
-  const response = await result.response.text();
+  const response = await result.response;
+  const text = await response.text();
 
-  return extractFormData(response);
-};
+  // Try to parse key-value pairs from Gemini's response
+  const updates: Partial<Record<"name" | "email" | "linkedin" | "aiIdea", string>> = {};
 
-const SYSTEM_PROMPT = `
-You're an AI copilot that helps users fill out a form with the following fields:
-- Name
-- Email
-- LinkedIn Profile
-- AI Agent Idea
+  const lower = text.toLowerCase();
 
-From the conversation history, extract only the updated field values in JSON like:
-{ "name": "John Doe", "email": "john@example.com", "linkedin": "https://linkedin.com/in/johndoe", "aiIdea": "An AI that generates marketing content." }
+  const nameMatch = text.match(/name[:\-\s]+([a-zA-Z ]{2,})/i);
+  if (nameMatch) updates.name = nameMatch[1].trim();
 
-If the user is reviewing or editing, update the fields accordingly.
-`;
+  const emailMatch = text.match(/[\w.-]+@[\w.-]+\.[a-zA-Z]{2,}/);
+  if (emailMatch) updates.email = emailMatch[0].trim();
 
-function extractFormData(text: string): Partial<{
-  name: string;
-  email: string;
-  linkedin: string;
-  aiIdea: string;
-}> {
-  try {
-    const jsonMatch = text.match(/\{[\s\S]*?\}/);
-    if (jsonMatch) {
-      return JSON.parse(jsonMatch[0]);
-    }
-  } catch (e) {
-    console.error('Failed to extract JSON:', e);
-  }
-  return {};
+  const linkedinMatch = text.match(/https?:\/\/[\w./-]*linkedin\.com\/[\w./-]+/);
+  if (linkedinMatch) updates.linkedin = linkedinMatch[0].trim();
+
+  const ideaMatch = text.match(/idea[:\-\s]+([\s\S]+)/i);
+  if (ideaMatch) updates.aiIdea = ideaMatch[1].trim();
+
+  return updates;
 }
