@@ -71,7 +71,8 @@ const Copilot = () => {
     }
   };
 
-  const generateFollowUpMessage = (fields: Partial<typeof form>) => {
+  const generateFollowUpMessage = (fields: Partial<{ name: string; email: string; linkedin: string; aiIdea: string }>) => {
+
     const remaining = [];
     if (!(fields.name || name)) remaining.push('your name');
     if (!(fields.email || email)) remaining.push('your email');
