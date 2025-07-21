@@ -1,98 +1,126 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { useFormContext } from './FormContext';
+import { useFormContext } from '../context/FormContext';
 import { callGeminiAPI } from '../lib/llmHandler';
+
+type Message = {
+  sender: 'user' | 'bot';
+  text: string;
+};
 
 export default function Copilot() {
   const { formData, updateForm } = useFormContext();
-  const [conversation, setConversation] = useState([
-    { role: 'ai', content: 'Hi! I’m your AI Copilot. Tell me about yourself and your AI idea.' },
+  const [messages, setMessages] = useState<Message[]>([
+    { sender: 'bot', text: 'Hi! I’m your AI Copilot. Tell me about yourself and your AI idea.' },
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
-  const allFieldsFilled = formData.name && formData.email && formData.linkedin && formData.idea;
+  const allFieldsFilled = Object.values(formData).every((val) => val.trim() !== '');
 
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [conversation]);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!input.trim()) return;
-
-    // Show user input
-    setConversation((prev) => [...prev, { role: 'user', content: input }]);
-
-    setIsLoading(true);
-    const response = await callGeminiAPI(input, formData);
-    setIsLoading(false);
-
-    // Update form if fields found
-    if (response?.updates) {
-      updateForm(response.updates);
-    }
-
-    // Show AI response
-    if (response?.message) {
-      setConversation((prev) => [...prev, { role: 'ai', content: response.message }]);
-    }
-
-    setInput('');
+  const scrollToBottom = () => {
+    scrollRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
   useEffect(() => {
-    if (allFieldsFilled) {
-      const summary = `
-✅ Here's what I’ve got:
-- Name: ${formData.name}
-- Email: ${formData.email}
-- LinkedIn: ${formData.linkedin}
-- AI Idea: ${formData.idea}
+    scrollToBottom();
+  }, [messages]);
 
-Would you like to edit anything?`;
-      setConversation((prev) => {
-        const alreadySummarized = prev.some((msg) =>
-          msg.content?.includes("Here's what I’ve got")
-        );
-        if (!alreadySummarized) {
-          return [...prev, { role: 'ai', content: summary }];
-        }
-        return prev;
-      });
+  const handleUserMessage = async () => {
+    if (!input.trim()) return;
+
+    const userMessage = input.trim();
+    setMessages((prev) => [...prev, { sender: 'user', text: userMessage }]);
+    setInput('');
+    setIsLoading(true);
+
+    const prompt = `
+Given this message: "${userMessage}"
+Extract or update any of the following fields if mentioned:
+- Name
+- Email
+- LinkedIn
+- AI Idea
+
+Current values: 
+Name: ${formData.name || 'N/A'}
+Email: ${formData.email || 'N/A'}
+LinkedIn: ${formData.linkedin || 'N/A'}
+AI Idea: ${formData.aiIdea || 'N/A'}
+
+Return only updated fields as JSON like:
+{"name": "John", "email": "john@email.com"}
+`;
+
+    try {
+      const response = await callGeminiAPI(prompt);
+
+      const match = response.match(/```json([\s\S]*?)```/);
+      const jsonString = match ? match[1] : response;
+
+      const updates = JSON.parse(jsonString);
+      updateForm(updates);
+
+      const botMessage = getBotResponse({ ...formData, ...updates });
+      setMessages((prev) => [...prev, { sender: 'bot', text: botMessage }]);
+    } catch (err) {
+      console.error(err);
+      setMessages((prev) => [...prev, { sender: 'bot', text: "Sorry, I couldn't process that." }]);
     }
-  }, [formData]);
+
+    setIsLoading(false);
+  };
+
+  const getBotResponse = (data: typeof formData) => {
+    if (!allFieldsFilled) {
+      const missing = Object.entries(data)
+        .filter(([, val]) => !val.trim())
+        .map(([key]) => key)
+        .join(', ');
+      return `Thanks! Could you also tell me your ${missing}?`;
+    } else {
+      return `Thanks! Here's what I got:\n\n- Name: ${data.name}\n- Email: ${data.email}\n- LinkedIn: ${data.linkedin}\n- AI Idea: ${data.aiIdea}\n\nLet me know if you'd like to edit any field.`;
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') handleUserMessage();
+  };
 
   return (
-    <div className="bg-gray-100 p-4 rounded shadow max-w-xl mx-auto h-[80vh] flex flex-col">
-      <div className="flex-1 overflow-y-auto space-y-2">
-        {conversation.map((msg, i) => (
-          <div key={i} className={`p-3 rounded ${msg.role === 'ai' ? 'bg-white text-black' : 'bg-blue-600 text-white self-end'}`}>
-            {msg.content}
+    <div className="w-full max-w-2xl mx-auto p-4 bg-gray-100 rounded-xl shadow-md text-black">
+      <h2 className="text-xl font-bold mb-4">🤖 AI Copilot</h2>
+      <div className="space-y-2 max-h-[400px] overflow-y-auto mb-4">
+        {messages.map((msg, idx) => (
+          <div
+            key={idx}
+            className={`p-3 rounded-lg whitespace-pre-line ${
+              msg.sender === 'user' ? 'bg-blue-100 text-right ml-10' : 'bg-white mr-10'
+            }`}
+          >
+            {msg.text}
           </div>
         ))}
-        {isLoading && (
-          <div className="p-3 bg-white rounded text-gray-600 italic">Typing...</div>
-        )}
-        <div ref={bottomRef} />
+        <div ref={scrollRef} />
       </div>
-
-      <form onSubmit={handleSubmit} className="mt-4 flex">
+      <div className="flex gap-2">
         <input
-          className="flex-1 border rounded p-2 mr-2"
+          className="flex-1 px-3 py-2 rounded border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400"
+          placeholder="Type something..."
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder="Type your message..."
+          onKeyDown={handleKeyDown}
         />
         <button
-          type="submit"
-          className="bg-blue-600 text-white px-4 py-2 rounded"
+          onClick={handleUserMessage}
+          disabled={isLoading}
+          className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 disabled:opacity-50"
         >
-          Send
+          {isLoading ? '...' : 'Send'}
         </button>
-      </form>
+      </div>
     </div>
   );
-}
+      }
