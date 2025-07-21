@@ -1,12 +1,8 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { FormData } from '../components/FormContext';
 
-const apiKey = process.env.GEMINI_API_KEY;
-if (!apiKey) {
-  throw new Error('GEMINI_API_KEY is not defined in environment variables');
-}
-
-const genAI = new GoogleGenerativeAI(apiKey);
+// Initialize Gemini model
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 
 const SYSTEM_PROMPT = `
 You are a helpful assistant designed to extract four fields from user input:
@@ -52,12 +48,15 @@ export async function callGeminiAPI(
   try {
     const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
 
-    const result = await model.generateContent([
-      { role: 'system', parts: SYSTEM_PROMPT },
-      ...messages,
-    ]);
+    // Combine system prompt and messages into a single string
+    const conversation = [
+      { parts: [{ text: SYSTEM_PROMPT }] },
+      ...messages.map((m) => ({ parts: [{ text: m.parts }] }))
+    ];
 
+    const result = await model.generateContent(conversation);
     const response = await result.response.text();
+
     return extractFieldsFromResponse(response);
   } catch (error) {
     console.error('Gemini API Error:', error);
