@@ -9,38 +9,35 @@ export type FormData = {
   aiIdea: string;
 };
 
-type FormContextType = {
-  form: FormData;
-  updateForm: (updates: Partial<FormData>) => void;
-};
-
-const defaultForm: FormData = {
+const defaultFormData: FormData = {
   name: '',
   email: '',
   linkedin: '',
   aiIdea: '',
 };
 
+type FormContextType = FormData & {
+  updateForm: (fields: Partial<FormData>) => void;
+};
+
 const FormContext = createContext<FormContextType | undefined>(undefined);
 
-export const FormProvider = ({ children }: { children: React.ReactNode }) => {
-  const [form, setForm] = useState<FormData>(defaultForm);
+export const useFormContext = () => {
+  const context = useContext(FormContext);
+  if (!context) throw new Error('useFormContext must be used within FormProvider');
+  return context;
+};
 
-  const updateForm = (updates: Partial<FormData>) => {
-    setForm(prev => ({ ...prev, ...updates }));
+export const FormProvider = ({ children }: { children: React.ReactNode }) => {
+  const [formData, setFormData] = useState<FormData>(defaultFormData);
+
+  const updateForm = (fields: Partial<FormData>) => {
+    setFormData(prev => ({ ...prev, ...fields }));
   };
 
   return (
-    <FormContext.Provider value={{ form, updateForm }}>
+    <FormContext.Provider value={{ ...formData, updateForm }}>
       {children}
     </FormContext.Provider>
   );
-};
-
-export const useFormContext = (): FormContextType => {
-  const context = useContext(FormContext);
-  if (!context) {
-    throw new Error('useFormContext must be used within a FormProvider');
-  }
-  return context;
 };
