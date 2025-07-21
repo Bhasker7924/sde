@@ -5,175 +5,98 @@ import { useFormContext } from './FormContext';
 import { callGeminiAPI } from '../lib/llmHandler';
 
 type Message = {
-  sender: 'user' | 'bot';
-  text: string;
+  role: 'user' | 'assistant';
+  content: string;
 };
 
 const Copilot = () => {
+  const { name, email, linkedin, aiIdea, updateForm } = useFormContext();
   const [messages, setMessages] = useState<Message[]>([
-    {
-      sender: 'bot',
-      text: 'Hi! I’m your AI copilot. Tell me about yourself, and I’ll help fill the form!',
-    },
+    { role: 'assistant', content: 'Hi! I’ll help you fill out the form. You can start by introducing yourself!' },
   ]);
   const [input, setInput] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+  const [isTyping, setIsTyping] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
-  const {
-    name,
-    email,
-    linkedin,
-    aiIdea,
-    updateForm,
-  } = useFormContext();
 
   const scrollToBottom = () => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
+  useEffect(scrollToBottom, [messages]);
 
-  const allFieldsFilled = name && email && linkedin && aiIdea;
-
-  const generatePrompt = (input: string) => {
-    return `
-You are a friendly AI form assistant. A user will tell you things in any order. Your job is to extract:
-
-- Name
-- Email
-- LinkedIn URL
-- AI idea
-
-Here is what the user said: "${input}"
-
-Return only the updated values in JSON format. Example:
-{ "name": "Alice", "email": "alice@example.com" }
-
-If no new info, return {}.
-`;
-  };
+  const isFormComplete = name && email && linkedin && aiIdea;
 
   const handleSend = async () => {
     if (!input.trim()) return;
-    const userMessage: Message = { sender: 'user', text: input };
-    setMessages(prev => [...prev, userMessage]);
+
+    const newMessages = [...messages, { role: 'user', content: input }];
+    setMessages(newMessages);
     setInput('');
-    setIsLoading(true);
+    setIsTyping(true);
 
-    const prompt = generatePrompt(input);
-    const result = await callGeminiAPI(prompt);
+    const formattedMessages = newMessages.map(m => ({
+      role: m.role,
+      parts: m.content,
+    }));
 
-    try {
-      const extracted = JSON.parse(result || '{}');
+    const extractedFields = await callGeminiAPI(formattedMessages);
+    updateForm(extractedFields);
 
-      // Update form context if values exist
-      if (extracted.name) updateForm('name', extracted.name);
-      if (extracted.email) updateForm('email', extracted.email);
-      if (extracted.linkedin) updateForm('linkedin', extracted.linkedin);
-      if (extracted.aiIdea || extracted.idea) {
-        updateForm('aiIdea', extracted.aiIdea || extracted.idea);
-      }
+    let nextBotMessage = '';
 
-      let botReply = '';
+    const stillMissing = [];
+    if (!name && !extractedFields.name) stillMissing.push('name');
+    if (!email && !extractedFields.email) stillMissing.push('email');
+    if (!linkedin && !extractedFields.linkedin) stillMissing.push('LinkedIn profile');
+    if (!aiIdea && !extractedFields.aiIdea) stillMissing.push('AI idea');
 
-      if (Object.keys(extracted).length === 0) {
-        if (allFieldsFilled) {
-          // Check if user wants edits
-          const lower = input.toLowerCase();
-          if (lower.includes('change') || lower.includes('edit')) {
-            botReply = 'Sure! Tell me what you want to update.';
-          } else {
-            botReply = 'All fields are already filled. Let me know if you’d like to make any changes.';
-          }
-        } else {
-          botReply = 'Got it. Please share more details like your email, LinkedIn, or your AI idea.';
-        }
-      } else {
-        botReply = 'Thanks! I’ve updated the form.';
-      }
+    if (stillMissing.length > 0) {
+      nextBotMessage = `Thanks! Could you also provide your ${stillMissing.join(', ')}?`;
+    } else {
+      nextBotMessage = `Great! Here's what I got:
+- Name: ${name || extractedFields.name}
+- Email: ${email || extractedFields.email}
+- LinkedIn: ${linkedin || extractedFields.linkedin}
+- AI Idea: ${aiIdea || extractedFields.aiIdea}
 
-      // After all fields filled, show summary
-      if (
-        !Object.keys(extracted).length &&
-        allFieldsFilled &&
-        !messages.some(m => m.text.includes('Here’s what I have so far'))
-      ) {
-        botReply += `\n\nHere’s what I have so far:
-- Name: ${name}
-- Email: ${email}
-- LinkedIn: ${linkedin}
-- AI Idea: ${aiIdea}
-
-Let me know if you’d like to update anything.`;
-      }
-
-      setMessages(prev => [...prev, { sender: 'bot', text: botReply }]);
-    } catch (err) {
-      console.error('Failed to parse LLM response', err);
-      setMessages(prev => [
-        ...prev,
-        {
-          sender: 'bot',
-          text: 'Oops! Something went wrong while understanding your input.',
-        },
-      ]);
+If you'd like to update anything, just let me know!`;
     }
 
-    setIsLoading(false);
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSend();
-    }
+    setMessages(prev => [...prev, { role: 'assistant', content: nextBotMessage }]);
+    setIsTyping(false);
   };
 
   return (
-    <div className="flex flex-col h-full bg-gray-900 text-white rounded-xl shadow-lg">
-      <div className="flex-1 overflow-y-auto p-4 space-y-3">
-        {messages.map((msg, idx) => (
+    <div className="p-4 bg-gray-50 text-black rounded-lg shadow-md max-w-2xl mx-auto">
+      <div className="h-96 overflow-y-auto space-y-3 border p-3 rounded bg-white">
+        {messages.map((m, i) => (
           <div
-            key={idx}
-            className={`flex ${
-              msg.sender === 'user' ? 'justify-end' : 'justify-start'
+            key={i}
+            className={`p-2 rounded-md ${
+              m.role === 'assistant' ? 'bg-blue-100 text-blue-900' : 'bg-green-100 text-green-900'
             }`}
           >
-            <div
-              className={`rounded-xl px-4 py-2 max-w-[80%] text-sm ${
-                msg.sender === 'user'
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-700 text-white'
-              }`}
-            >
-              {msg.text}
-            </div>
+            {m.content}
           </div>
         ))}
-        {isLoading && (
-          <div className="text-sm text-gray-400">Typing...</div>
-        )}
+        {isTyping && <div className="italic text-gray-500">Typing...</div>}
         <div ref={chatEndRef} />
       </div>
-      <div className="p-3 border-t border-gray-700 bg-gray-800">
-        <div className="flex gap-2">
-          <input
-            className="flex-1 p-2 rounded-lg bg-gray-700 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="Say something..."
-            value={input}
-            onChange={e => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-          />
-          <button
-            onClick={handleSend}
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition"
-            disabled={isLoading}
-          >
-            Send
-          </button>
-        </div>
+
+      <div className="flex mt-4 gap-2">
+        <input
+          value={input}
+          onChange={e => setInput(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && handleSend()}
+          placeholder="Type your message..."
+          className="flex-1 border rounded px-3 py-2"
+        />
+        <button
+          onClick={handleSend}
+          className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+        >
+          Send
+        </button>
       </div>
     </div>
   );
