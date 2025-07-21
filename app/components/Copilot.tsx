@@ -9,119 +9,129 @@ type ChatMessage = {
   parts: string;
 };
 
-export default function Copilot() {
+const Copilot = () => {
   const { name, email, linkedin, aiIdea, updateForm } = useFormContext();
-  const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [isComplete, setIsComplete] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [showReview, setShowReview] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
 
-  const allFieldsFilled = name && email && linkedin && aiIdea;
+  const allFilled = name && email && linkedin && aiIdea;
+
+  useEffect(() => {
+    if (containerRef.current) {
+      containerRef.current.scrollTop = containerRef.current.scrollHeight;
+    }
+  }, [chatHistory, isLoading]);
 
   const handleSend = async () => {
     if (!input.trim()) return;
-
-    const newHistory = [...chatHistory, { role: 'user', parts: input }];
+    const userMessage: ChatMessage = { role: 'user', parts: input };
+    const newHistory = [...chatHistory, userMessage];
     setChatHistory(newHistory);
     setInput('');
-    setLoading(true);
+    setIsLoading(true);
 
-    const extracted = await callGeminiAPI(newHistory);
-    updateForm(extracted);
+    const fieldUpdates = await callGeminiAPI(newHistory);
+    updateForm(fieldUpdates);
 
-    const assistantMsg = generateAssistantResponse(extracted);
-    setChatHistory([...newHistory, { role: 'assistant', parts: assistantMsg }]);
-    setLoading(false);
-  };
+    const filledAfterUpdate =
+      (fieldUpdates.name || name) &&
+      (fieldUpdates.email || email) &&
+      (fieldUpdates.linkedin || linkedin) &&
+      (fieldUpdates.aiIdea || aiIdea);
 
-  const generateAssistantResponse = (extracted: Partial<typeof import('../context/FormContext').FormData>) => {
-    if (Object.keys(extracted).length === 0) return "Sorry, I couldn't get that. Could you rephrase?";
-
-    if (!allFieldsFilled) {
-      const filled = Object.entries(extracted)
-        .filter(([_, v]) => v)
-        .map(([k, v]) => `${k}: ${v}`)
-        .join(', ');
-      return `Got it. You provided: ${filled}. Anything else you'd like to share?`;
-    } else {
-      setIsComplete(true);
-      return `Thanks! Here's what I got:
-- Name: ${name}
-- Email: ${email}
-- LinkedIn: ${linkedin}
-- AI Idea: ${aiIdea}
-
-Would you like to review or edit any field? Just let me know.`;
-    }
-  };
-
-  const handleEdit = async () => {
-    setIsComplete(false);
-    const editPrompt = 'Sure! Which field would you like to update? (name, email, linkedin, aiIdea)';
-    setChatHistory([...chatHistory, { role: 'assistant', parts: editPrompt }]);
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') handleSend();
-  };
-
-  useEffect(() => {
-    if (chatHistory.length === 0) {
+    if (filledAfterUpdate) {
+      setShowReview(true);
+      setIsLoading(false);
       setChatHistory([
+        ...newHistory,
         {
           role: 'assistant',
-          parts: 'Hi! I’m your AI assistant. Tell me your name, email, LinkedIn, and AI idea. You can start naturally!',
+          parts:
+            "Thanks! Here's what I’ve got:\n\n" +
+            `👤 Name: ${fieldUpdates.name || name}\n` +
+            `📧 Email: ${fieldUpdates.email || email}\n` +
+            `🔗 LinkedIn: ${fieldUpdates.linkedin || linkedin}\n` +
+            `💡 AI Idea: ${fieldUpdates.aiIdea || aiIdea}\n\n` +
+            'Would you like to edit anything?',
         },
       ]);
+    } else {
+      const assistantMsg = generateFollowUpMessage(fieldUpdates);
+      setChatHistory([
+        ...newHistory,
+        {
+          role: 'assistant',
+          parts: assistantMsg,
+        },
+      ]);
+      setIsLoading(false);
     }
-  }, []);
+  };
+
+  const generateFollowUpMessage = (fields: Partial<typeof form>) => {
+    const remaining = [];
+    if (!(fields.name || name)) remaining.push('your name');
+    if (!(fields.email || email)) remaining.push('your email');
+    if (!(fields.linkedin || linkedin)) remaining.push('your LinkedIn profile');
+    if (!(fields.aiIdea || aiIdea)) remaining.push('your AI idea');
+
+    if (remaining.length === 0) return 'Got it!';
+    return `Thanks! Can you also provide ${remaining.join(', ')}?`;
+  };
 
   return (
-    <div className="p-4 bg-gray-100 dark:bg-gray-900 text-black dark:text-white rounded-xl max-w-xl mx-auto mt-8 shadow-lg">
-      <div className="space-y-2 h-96 overflow-y-auto mb-4 p-2 border border-gray-300 dark:border-gray-700 rounded bg-white dark:bg-gray-800">
+    <div className="p-4 rounded-xl border bg-white shadow-xl max-w-xl mx-auto mt-6">
+      <div
+        ref={containerRef}
+        className="h-[300px] overflow-y-auto mb-4 p-2 border rounded bg-gray-50 text-black"
+      >
         {chatHistory.map((msg, idx) => (
           <div
             key={idx}
-            className={`p-2 rounded-lg ${
-              msg.role === 'user' ? 'text-right text-blue-600' : 'text-left text-green-600'
+            className={`mb-2 whitespace-pre-wrap ${
+              msg.role === 'user' ? 'text-blue-700 font-semibold' : 'text-gray-800'
             }`}
           >
-            <span className="block whitespace-pre-wrap">{msg.parts}</span>
+            <strong>{msg.role === 'user' ? 'You' : 'Copilot'}:</strong> {msg.parts}
           </div>
         ))}
-        {loading && <div className="text-gray-400 italic">Assistant is typing...</div>}
+        {isLoading && <div className="text-sm text-gray-500 italic">Copilot is typing...</div>}
       </div>
 
-      <div className="flex gap-2">
+      <div className="flex space-x-2">
         <input
-          ref={inputRef}
-          type="text"
+          className="flex-1 border px-3 py-2 rounded bg-white text-black"
+          placeholder="Talk to your AI copilot..."
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          onKeyDown={handleKeyDown}
-          className="flex-1 px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-black dark:text-white focus:outline-none"
-          placeholder="Type your message..."
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') handleSend();
+          }}
         />
         <button
+          className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
           onClick={handleSend}
-          disabled={loading}
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition"
         >
           Send
         </button>
       </div>
 
-      {isComplete && (
-        <div className="mt-4 text-sm text-center">
-          <button
-            onClick={handleEdit}
-            className="text-blue-500 underline hover:text-blue-700"
-          >
-            Edit your details
-          </button>
+      {showReview && allFilled && (
+        <div className="mt-6 p-4 bg-green-100 border border-green-300 rounded text-black">
+          <h2 className="text-lg font-semibold mb-2">✅ Review your submission</h2>
+          <p><strong>👤 Name:</strong> {name}</p>
+          <p><strong>📧 Email:</strong> {email}</p>
+          <p><strong>🔗 LinkedIn:</strong> {linkedin}</p>
+          <p><strong>💡 AI Idea:</strong> {aiIdea}</p>
+          <p className="mt-2">If you'd like to edit anything, just say so!</p>
         </div>
       )}
     </div>
   );
-}
+};
+
+export default Copilot;
+        
