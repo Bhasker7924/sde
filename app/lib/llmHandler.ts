@@ -1,7 +1,6 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenerativeAI, Part } from '@google/generative-ai';
 import { FormData } from '../components/FormContext';
 
-// Initialize Gemini model
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 
 const SYSTEM_PROMPT = `
@@ -27,7 +26,6 @@ function extractFieldsFromResponse(text: string): Partial<FormData> {
   try {
     const jsonMatch = text.match(/{[\s\S]*}/);
     if (!jsonMatch) return {};
-
     const parsed = JSON.parse(jsonMatch[0]);
 
     return {
@@ -48,13 +46,13 @@ export async function callGeminiAPI(
   try {
     const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
 
-    // Combine system prompt and messages into a single string
-    const conversation = [
-      { parts: [{ text: SYSTEM_PROMPT }] },
-      ...messages.map((m) => ({ parts: [{ text: m.parts }] }))
+    // Flatten system prompt and user-assistant messages
+    const promptParts: Part[] = [
+      { text: SYSTEM_PROMPT },
+      ...messages.map((m) => ({ text: m.parts }))
     ];
 
-    const result = await model.generateContent(conversation);
+    const result = await model.generateContent(promptParts);
     const response = await result.response.text();
 
     return extractFieldsFromResponse(response);
