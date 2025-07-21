@@ -1,5 +1,5 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { FormData } from '../components/FormContext';
+import type { FormData } from '../components/FormContext'; // Make sure FormData is exported
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 
@@ -37,15 +37,24 @@ function extractFieldsFromResponse(text: string): Partial<FormData> {
   }
 }
 
+type ChatMessage = {
+  role: 'user' | 'assistant';
+  parts: string;
+};
+
 export async function callGeminiAPI(
-  messages: { role: 'user' | 'assistant'; parts: string }[]
+  messages: ChatMessage[]
 ): Promise<Partial<FormData>> {
   try {
     const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
 
+    const formattedMessages = messages.map((msg) => ({
+      parts: [msg.parts], // Gemini expects array of strings
+    }));
+
     const result = await model.generateContent([
-      { role: 'system', parts: SYSTEM_PROMPT },
-      ...messages,
+      { parts: [SYSTEM_PROMPT] }, // no role
+      ...formattedMessages,
     ]);
 
     const response = await result.response.text();
