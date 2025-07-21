@@ -37,7 +37,7 @@ export const FormProvider = ({ children }: { children: React.ReactNode }) => {
   );
 };
 
-export const useFormContext = () => {
+export const useFormContext = (): FormContextType => {
   const context = useContext(FormContext);
   if (!context) {
     throw new Error('useFormContext must be used within a FormProvider');
