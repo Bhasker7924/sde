@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import { useFormContext } from './FormContext';
+import React, { useState, useEffect, useRef } from 'react';
+import { useFormContext } from '../context/FormContext';
 import { callGeminiAPI } from '../lib/llmHandler';
 
 type ChatMessage = {
@@ -9,108 +9,119 @@ type ChatMessage = {
   parts: string;
 };
 
-type UIMessage = {
-  role: 'user' | 'bot';
-  content: string;
-};
-
-const Copilot = () => {
+export default function Copilot() {
   const { name, email, linkedin, aiIdea, updateForm } = useFormContext();
-  const [messages, setMessages] = useState<UIMessage[]>([
-    { role: 'bot', content: 'Hi! I’m your AI assistant. Tell me a bit about yourself to get started.' },
-  ]);
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const [loading, setLoading] = useState(false);
+  const [isComplete, setIsComplete] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  const allFilled = name && email && linkedin && aiIdea;
+  const allFieldsFilled = name && email && linkedin && aiIdea;
 
   const handleSend = async () => {
     if (!input.trim()) return;
 
-    const userMsg: UIMessage = { role: 'user', content: input };
-    const botThinking: UIMessage = { role: 'bot', content: 'Thinking...' };
-    setMessages(prev => [...prev, userMsg, botThinking]);
+    const newHistory = [...chatHistory, { role: 'user', parts: input }];
+    setChatHistory(newHistory);
     setInput('');
-    setIsLoading(true);
+    setLoading(true);
 
-    const newChatHistory = [...chatHistory, { role: 'user', parts: input }];
-    setChatHistory(newChatHistory);
+    const extracted = await callGeminiAPI(newHistory);
+    updateForm(extracted);
 
-    const replyFields = await callGeminiAPI(newChatHistory);
-    const fieldSummary = Object.entries(replyFields)
-      .filter(([_, val]) => val)
-      .map(([key, val]) => `**${key}**: ${val}`)
-      .join('\n');
+    const assistantMsg = generateAssistantResponse(extracted);
+    setChatHistory([...newHistory, { role: 'assistant', parts: assistantMsg }]);
+    setLoading(false);
+  };
 
-    const botReply = fieldSummary
-      ? `Got it! Here's what I found:\n${fieldSummary}`
-      : `Thanks! Let me know more so I can fill in your details.`;
+  const generateAssistantResponse = (extracted: Partial<typeof import('../context/FormContext').FormData>) => {
+    if (Object.keys(extracted).length === 0) return "Sorry, I couldn't get that. Could you rephrase?";
 
-    setMessages(prev => {
-      const updated = [...prev];
-      updated[updated.length - 1] = { role: 'bot', content: botReply };
-      return updated;
-    });
+    if (!allFieldsFilled) {
+      const filled = Object.entries(extracted)
+        .filter(([_, v]) => v)
+        .map(([k, v]) => `${k}: ${v}`)
+        .join(', ');
+      return `Got it. You provided: ${filled}. Anything else you'd like to share?`;
+    } else {
+      setIsComplete(true);
+      return `Thanks! Here's what I got:
+- Name: ${name}
+- Email: ${email}
+- LinkedIn: ${linkedin}
+- AI Idea: ${aiIdea}
 
-    if (Object.keys(replyFields).length) {
-      updateForm(replyFields);
+Would you like to review or edit any field? Just let me know.`;
     }
+  };
 
-    setIsLoading(false);
+  const handleEdit = async () => {
+    setIsComplete(false);
+    const editPrompt = 'Sure! Which field would you like to update? (name, email, linkedin, aiIdea)';
+    setChatHistory([...chatHistory, { role: 'assistant', parts: editPrompt }]);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') handleSend();
   };
 
   useEffect(() => {
-    containerRef.current?.scrollTo(0, containerRef.current.scrollHeight);
-  }, [messages]);
+    if (chatHistory.length === 0) {
+      setChatHistory([
+        {
+          role: 'assistant',
+          parts: 'Hi! I’m your AI assistant. Tell me your name, email, LinkedIn, and AI idea. You can start naturally!',
+        },
+      ]);
+    }
+  }, []);
 
   return (
-    <div className="bg-gray-100 text-black h-full flex flex-col rounded-xl border border-gray-300 p-4 shadow-md">
-      <div ref={containerRef} className="flex-1 overflow-y-auto space-y-2">
-        {messages.map((msg, idx) => (
+    <div className="p-4 bg-gray-100 dark:bg-gray-900 text-black dark:text-white rounded-xl max-w-xl mx-auto mt-8 shadow-lg">
+      <div className="space-y-2 h-96 overflow-y-auto mb-4 p-2 border border-gray-300 dark:border-gray-700 rounded bg-white dark:bg-gray-800">
+        {chatHistory.map((msg, idx) => (
           <div
             key={idx}
-            className={`p-2 rounded-md text-sm max-w-[80%] ${
-              msg.role === 'user' ? 'bg-blue-100 self-end' : 'bg-white self-start'
+            className={`p-2 rounded-lg ${
+              msg.role === 'user' ? 'text-right text-blue-600' : 'text-left text-green-600'
             }`}
           >
-            {msg.content}
+            <span className="block whitespace-pre-wrap">{msg.parts}</span>
           </div>
         ))}
+        {loading && <div className="text-gray-400 italic">Assistant is typing...</div>}
       </div>
 
-      <div className="mt-4 flex">
+      <div className="flex gap-2">
         <input
-          className="flex-1 border border-gray-400 rounded-l-md p-2"
+          ref={inputRef}
+          type="text"
           value={input}
-          onChange={e => setInput(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && handleSend()}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={handleKeyDown}
+          className="flex-1 px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-black dark:text-white focus:outline-none"
           placeholder="Type your message..."
         />
         <button
-          className="bg-blue-600 text-white px-4 py-2 rounded-r-md"
           onClick={handleSend}
-          disabled={isLoading}
+          disabled={loading}
+          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition"
         >
           Send
         </button>
       </div>
 
-      {allFilled && (
-        <div className="mt-4 bg-green-100 text-green-800 p-3 rounded-md text-sm">
-          ✅ All fields filled! Review them below:
-          <ul className="list-disc list-inside mt-2">
-            <li><strong>Name:</strong> {name}</li>
-            <li><strong>Email:</strong> {email}</li>
-            <li><strong>LinkedIn:</strong> {linkedin}</li>
-            <li><strong>AI Idea:</strong> {aiIdea}</li>
-          </ul>
-          You can edit any of these by typing a correction.
+      {isComplete && (
+        <div className="mt-4 text-sm text-center">
+          <button
+            onClick={handleEdit}
+            className="text-blue-500 underline hover:text-blue-700"
+          >
+            Edit your details
+          </button>
         </div>
       )}
     </div>
   );
-};
-
-export default Copilot;
+}
