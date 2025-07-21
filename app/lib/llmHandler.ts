@@ -1,66 +1,57 @@
+// app/lib/llmHandler.ts
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import type { FormData } from '../components/FormContext'; // Make sure FormData is exported
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+const genAI = new GoogleGenerativeAI(process.env.NEXT_PUBLIC_GEMINI_API_KEY!);
 
-const SYSTEM_PROMPT = `
-You are a helpful assistant designed to extract four fields from user input:
-- name
-- email
-- linkedin
-- aiIdea
+export const callGeminiAPI = async (messages: { role: 'user' | 'assistant'; parts: string }[]) => {
+  const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
 
-Use this JSON format only:
-{
-  "name": "",
-  "email": "",
-  "linkedin": "",
-  "aiIdea": ""
-}
-Only update fields the user explicitly mentions.
-`;
+  const formattedMessages = messages.map((msg) => ({
+    role: msg.role,
+    parts: [{ text: msg.parts }],
+  }));
 
-function extractFieldsFromResponse(text: string): Partial<FormData> {
-  try {
-    const jsonMatch = text.match(/{[\s\S]*}/);
-    if (!jsonMatch) return {};
-    const parsed = JSON.parse(jsonMatch[0]);
-    return {
-      name: parsed.name || '',
-      email: parsed.email || '',
-      linkedin: parsed.linkedin || '',
-      aiIdea: parsed.aiIdea || '',
-    };
-  } catch (err) {
-    console.error('Error parsing Gemini output:', err);
-    return {};
-  }
-}
+  const result = await model.generateContent({
+    contents: [
+      {
+        role: 'user',
+        parts: [{ text: SYSTEM_PROMPT }],
+      },
+      ...formattedMessages,
+    ],
+  });
 
-type ChatMessage = {
-  role: 'user' | 'assistant';
-  parts: string;
+  const response = await result.response.text();
+
+  return extractFormData(response);
 };
 
-export async function callGeminiAPI(
-  messages: ChatMessage[]
-): Promise<Partial<FormData>> {
+const SYSTEM_PROMPT = `
+You're an AI copilot that helps users fill out a form with the following fields:
+- Name
+- Email
+- LinkedIn Profile
+- AI Agent Idea
+
+From the conversation history, extract only the updated field values in JSON like:
+{ "name": "John Doe", "email": "john@example.com", "linkedin": "https://linkedin.com/in/johndoe", "aiIdea": "An AI that generates marketing content." }
+
+If the user is reviewing or editing, update the fields accordingly.
+`;
+
+function extractFormData(text: string): Partial<{
+  name: string;
+  email: string;
+  linkedin: string;
+  aiIdea: string;
+}> {
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
-
-    const formattedMessages = messages.map((msg) => ({
-      parts: [msg.parts], // Gemini expects array of strings
-    }));
-
-    const result = await model.generateContent([
-      { role: 'user', parts: [SYSTEM_PROMPT] },
-      ...formattedMessages,
-    ]);
-
-    const response = await result.response.text();
-    return extractFieldsFromResponse(response);
-  } catch (error) {
-    console.error('Gemini API Error:', error);
-    return {};
+    const jsonMatch = text.match(/\{[\s\S]*?\}/);
+    if (jsonMatch) {
+      return JSON.parse(jsonMatch[0]);
+    }
+  } catch (e) {
+    console.error('Failed to extract JSON:', e);
   }
+  return {};
 }
