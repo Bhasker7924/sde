@@ -1,153 +1,127 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
-import { useFormContext } from './FormContext';
-import { callGeminiAPI } from '../lib/llmHandler';
+import { useState, useEffect, useRef } from 'react';
+import { useFormContext } from '@/components/FormContext';
+import { callGeminiAPI } from '@/lib/llmHandler';
 
 interface Message {
-  role: 'user' | 'assistant';
-  content: string;
+  sender: 'user' | 'bot';
+  text: string;
 }
 
-const Copilot = () => {
-  const { formData, updateForm } = useFormContext();
+export default function CopilotUI() {
+  const { form, updateForm } = useFormContext();
   const [messages, setMessages] = useState<Message[]>([
     {
-      role: 'assistant',
-      content: 'Hi! I’m your AI Copilot 🤖. I’ll help you fill this form. Tell me a bit about yourself.',
+      sender: 'bot',
+      text: "Hi! I'm your AI Copilot 🤖. I'll help you fill this form. Tell me a bit about yourself.",
     },
   ]);
   const [input, setInput] = useState('');
-  const [loading, setLoading] = useState(false);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isComplete, setIsComplete] = useState(false);
+  const bottomRef = useRef<HTMLDivElement>(null);
 
-  // Scroll to bottom on new message
+  const allFieldsFilled = form.name && form.email && form.linkedin && form.aiIdea;
+
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Check if all 4 fields are filled
-  const isFormComplete = () =>
-    formData.name && formData.email && formData.linkedin && formData.aiIdea;
-
-  // Format filled fields for review
-  const formatReview = () => {
-    return `Here's what I've got:
-- 👤 Name: ${formData.name}
-- 📧 Email: ${formData.email}
-- 🔗 LinkedIn: ${formData.linkedin}
-- 💡 AI Idea: ${formData.aiIdea}
-
-Would you like to edit any of these?`;
-  };
-
-  const handleSend = async () => {
+  const handleUserInput = async () => {
     if (!input.trim()) return;
-
-    const userMessage: Message = { role: 'user', content: input };
-    const updatedMessages = [...messages, userMessage];
-    setMessages(updatedMessages);
+    const userMessage = { sender: 'user', text: input };
+    setMessages(prev => [...prev, userMessage]);
     setInput('');
-    setLoading(true);
+    setIsLoading(true);
 
     try {
-      const llmMessages = updatedMessages.map((msg) => ({
-        role: msg.role,
-        parts: msg.content,
-      }));
+      const response = await callGeminiAPI([...messages, userMessage]);
+      const text = response.text;
+      const extracted = response.fields;
 
-      const updates = await callGeminiAPI(llmMessages);
+      // Update form if new fields are found
+      if (extracted.name) updateForm('name', extracted.name);
+      if (extracted.email) updateForm('email', extracted.email);
+      if (extracted.linkedin) updateForm('linkedin', extracted.linkedin);
+      if (extracted.aiIdea) updateForm('aiIdea', extracted.aiIdea);
 
-      if (Object.keys(updates).length > 0) {
-        updateForm(updates);
-      }
-
-      let botReply = '';
-
-      if (!isFormComplete()) {
-        const missing = [];
-        if (!formData.name && !updates.name) missing.push('name');
-        if (!formData.email && !updates.email) missing.push('email');
-        if (!formData.linkedin && !updates.linkedin) missing.push('LinkedIn');
-        if (!formData.aiIdea && !updates.aiIdea) missing.push('AI idea');
-
-        if (missing.length) {
-          botReply = `Thanks! Could you tell me your ${missing[0]}?`;
-        } else {
-          botReply = `Thanks!`;
-        }
+      // After all 4 fields are filled
+      if (!isComplete && form.name && form.email && form.linkedin && form.aiIdea) {
+        setMessages(prev => [
+          ...prev,
+          { sender: 'bot', text },
+          {
+            sender: 'bot',
+            text: `Here's what I got:\n\n👤 Name: ${form.name}\n📧 Email: ${form.email}\n🔗 LinkedIn: ${form.linkedin}\n💡 AI Idea: ${form.aiIdea}\n\nDo you want to edit anything?`,
+          },
+        ]);
+        setIsComplete(true);
       } else {
-        if (input.toLowerCase().includes('edit')) {
-          botReply = `Sure! Let me know which field you'd like to update (name, email, LinkedIn, or AI idea).`;
-        } else {
-          botReply = formatReview();
-        }
+        setMessages(prev => [...prev, { sender: 'bot', text }]);
       }
-
-      setMessages([...updatedMessages, { role: 'assistant', content: botReply }]);
-    } catch (error) {
-      setMessages([
-        ...updatedMessages,
-        {
-          role: 'assistant',
-          content: 'Oops! Something went wrong. Please try again.',
-        },
-      ]);
-    } finally {
-      setLoading(false);
+    } catch (err) {
+      setMessages(prev => [...prev, { sender: 'bot', text: "Oops! Something went wrong." }]);
     }
+
+    setIsLoading(false);
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSend();
-    }
+  const handleEditCommand = () => {
+    setMessages(prev => [
+      ...prev,
+      { sender: 'bot', text: 'Sure! Tell me what to update (e.g., "Change my email to abc@xyz.com").' },
+    ]);
+    setIsComplete(false); // Allow edits
   };
 
   return (
-    <div className="w-full max-w-xl mx-auto mt-6 bg-white rounded-2xl shadow p-4">
-      <h2 className="text-xl font-bold mb-2 text-black">AI Copilot 🤖</h2>
-      <div className="h-96 overflow-y-auto space-y-2 bg-gray-100 p-3 rounded">
-        {messages.map((msg, idx) => (
+    <div className="w-full p-4 border rounded-xl shadow-md bg-white text-black max-h-[80vh] overflow-y-auto">
+      <h2 className="text-lg font-bold mb-2">AI Copilot 🤖</h2>
+      <div className="space-y-2">
+        {messages.map((msg, index) => (
           <div
-            key={idx}
-            className={`p-2 rounded-xl max-w-[80%] whitespace-pre-wrap ${
-              msg.role === 'user'
+            key={index}
+            className={`p-2 rounded-lg max-w-[80%] whitespace-pre-wrap ${
+              msg.sender === 'user'
                 ? 'bg-blue-500 text-white self-end ml-auto'
-                : 'bg-gray-300 text-black'
+                : 'bg-gray-200 text-black self-start'
             }`}
           >
-            {msg.content}
+            {msg.text}
           </div>
         ))}
-        {loading && (
-          <div className="p-2 bg-gray-300 text-black rounded-xl inline-block animate-pulse">
-            Thinking...
-          </div>
+        {isLoading && (
+          <div className="bg-gray-200 text-black p-2 rounded-lg inline-block">Typing...</div>
         )}
-        <div ref={messagesEndRef} />
+        <div ref={bottomRef}></div>
       </div>
-      <div className="mt-4 flex items-center gap-2">
-        <textarea
-          className="flex-grow p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400"
-          rows={2}
-          placeholder="Type your message..."
+      <div className="mt-4 flex gap-2">
+        <input
           value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={handleKeyDown}
+          onChange={e => setInput(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && handleUserInput()}
+          className="flex-1 border p-2 rounded bg-white text-black"
+          placeholder="Type your message..."
         />
         <button
-          onClick={handleSend}
-          disabled={loading}
-          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+          onClick={handleUserInput}
+          disabled={isLoading}
+          className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
         >
           Send
         </button>
       </div>
+      {isComplete && (
+        <div className="mt-2">
+          <button
+            onClick={handleEditCommand}
+            className="text-sm text-blue-600 underline hover:text-blue-800"
+          >
+            Edit something
+          </button>
+        </div>
+      )}
     </div>
   );
-};
-
-export default Copilot;
-          
+}
