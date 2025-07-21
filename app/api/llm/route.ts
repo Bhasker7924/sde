@@ -1,176 +1,131 @@
-// app/api/llm/route.ts
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 
-// --- Type Definitions (THESE WERE LIKELY MISSING/COMMENTED OUT) ---
-export type Message = {
-  role: 'user' | 'assistant';
-  content: string; // Your internal display field
-  parts: { text: string }[]; // Required for LLM history/content
-};
-
-// This type should match your FormContext's FormData type for the fields that can be updated
-type LLMManagedFormData = {
-  name?: string;
-  email?: string;
-  linkedin?: string; // Using 'linkedin' to match your FormContext and AgentForm
-  idea?: string;
-};
-
-type LLMResponseOutput = {
+// Define the expected structure of the LLM's parsed JSON response
+type ParsedLLMResponse = {
   message: string;
-  updates: Partial<LLMManagedFormData>;
+  updates: {
+    name?: string;
+    email?: string;
+    linkedin?: string; // Expect lowercase 'l'
+    aiIdea?: string;   // Expect camelCase 'aiIdea'
+  };
 };
-// --- END Type Definitions ---
 
+// --- API Key Check and Initialization ---
+if (!process.env.GOOGLE_API_KEY) {
+  throw new Error('❌ GOOGLE_API_KEY is missing from environment variables. Set it in Vercel settings.');
+}
 
-// --- API Key Initialization ---
-// IMPORTANT: Ensure GEMINI_API_KEY is set in your .env.local for local development
-// and in Vercel Environment Variables for deployment.
-console.log('API Key Status:', process.env.GEMINI_API_KEY ? 'Set (******)' : 'NOT SET');
+console.log(
+  '🚀 API key Status:',
+  process.env.GOOGLE_API_KEY ? 'Key is present and has value' : 'Key is missing or empty'
+);
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY as string);
-const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite-preview-06-17" }); // Or "gemini-2.5-flash-lite-001" if you used the stable one
+const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY || '');
 
-export async function POST(req: Request) {
+// --- POST Request Handler ---
+export async function POST(req: NextRequest) {
   try {
-    const { messages, currentFormData }: { messages: Message[], currentFormData: LLMManagedFormData } = await req.json();
+    const body = await req.json();
+    const { messages } = body;
 
-    // 1. Determine what information is missing/needed
-    let nextFieldToAskFor: keyof LLMManagedFormData | 'all_collected' = 'all_collected';
-    if (!currentFormData.name || currentFormData.name.trim() === '') {
-      nextFieldToAskFor = 'name';
-    } else if (!currentFormData.email || currentFormData.email.trim() === '') {
-      nextFieldToAskFor = 'email';
-    } else if (!currentFormData.linkedin || currentFormData.linkedin.trim() === '') {
-      nextFieldToAskFor = 'linkedin';
-    } else if (!currentFormData.idea || currentFormData.idea.trim() === '') {
-      nextFieldToAskFor = 'idea';
+    if (!messages || !Array.isArray(messages)) {
+      return NextResponse.json({ error: 'Missing messages array' }, { status: 400 });
     }
 
-    // 2. Dynamically construct the System Prompt based on missing fields
-    let systemInstructionContent = `You are an AI assistant helping a user fill out a form for an AI agent idea.
-    Your goal is to gather specific information: name, email, LinkedIn profile URL, and their AI agent idea.
-    You must act as a structured information collection agent.
+    // Convert OpenAI-style messages to Gemini-style contents
+    const contents = messages.map((msg: any) => ({
+      role: msg.role === 'user' ? 'user' : 'model',
+      parts: [{ text: msg.content }],
+    }));
 
-    Current form data already collected: ${JSON.stringify(currentFormData)}
+    // Add the system instruction for the AI, guiding its behavior and output format.
+    const systemInstruction = {
+        role: 'user',
+        parts: [
+          {
+            text: `You are a smart and friendly AI Copilot helping users fill out a form with these 4 fields:
+- name
+- email
+- linkedin (as 'linkedin')
+- AI idea (as 'aiIdea')
 
-    Instructions for your response:
-    - ALWAYS respond with a friendly, natural language message.
-    - ALWAYS include an 'updates' JSON object at the end of your response, even if it's empty ({}) or only contains a subset of fields.
-    - **Crucially, if the user mentions any correction or update to a previously collected field (name, email, linkedin, idea), identify and include that updated field in the 'updates' JSON object.**
-    - Only include fields in 'updates' that you have positively identified and extracted from the user's *current* message.
-    - Do not include fields in 'updates' that are already correctly in 'Current form data already collected' unless the user is explicitly updating it.
-    - For LinkedIn, accept variations like "linkedin.com/in/..." or just the username.
-    - For AI Idea, accept a description.
+Extract values directly from conversation. If the user says "Hi this is Priya", extract name: "Priya". Only enter the value, not the entire sentence.
+Reply naturally but only once with things like "Nice to meet you."
+Always return JSON format:
+{
+  "message": "Thanks! What's your email?",
+  "updates": {
+    "name": "Priya",
+    "email": "priya@example.com",
+    "linkedin": "https://linkedin.com/in/priya",
+    "aiIdea": "A system for personalized learning paths"
+  }
+}
+Only include updated fields inside 'updates'. If none, return empty updates. Do not repeat fields. Always return valid JSON.`,
+          },
+        ],
+      };
 
-    Example response format:
-    {
-      "message": "That's a great idea! What's your full name?",
-      "updates": {
-        "idea": "AI for recipe ingredients"
-      }
-    }
-    `;
 
-    let assistantFallbackMessage = '';
-    if (nextFieldToAskFor === 'name') {
-      systemInstructionContent += `\nYour primary focus now is to get the user's full name. If it's missing or unclear, ask for it.`;
-      assistantFallbackMessage = "Hello! What's your full name?";
-    } else if (nextFieldToAskFor === 'email') {
-      systemInstructionContent += `\nYour primary focus now is to get the user's email address. If it's missing or unclear, ask for it.`;
-      assistantFallbackMessage = "Great! What's your email address?";
-    } else if (nextFieldToAskFor === 'linkedin') {
-      systemInstructionContent += `\nYour primary focus now is to get the user's LinkedIn profile URL. If it's missing or unclear, ask for it.`;
-      assistantFallbackMessage = "Thanks! Can you please provide your LinkedIn profile URL?";
-    } else if (nextFieldToAskFor === 'idea') {
-      systemInstructionContent += `\nYour primary focus now is to get the user's AI agent idea. If it's missing or unclear, ask for it.`;
-      assistantFallbackMessage = "Got it! Now, please describe your AI agent idea.";
-    } else if (nextFieldToAskFor === 'all_collected') {
-      systemInstructionContent += `\nAll required information has been gathered. Summarize the collected information and ask for final confirmation from the user. Do not ask for new information.
-      When summarizing, list each collected field clearly with emojis for better readability. For example: "Here's what I have so far: 👤 Name: [name], 📧 Email: [email], 🔗 LinkedIn: [linkedin], 💡 AI Idea: [idea]. Does this look correct? You can tell me if anything needs to be updated."`; // Enhanced for explicit formatting
-      assistantFallbackMessage = `All details are collected! Here's what I have: Name: ${currentFormData.name}, Email: ${currentFormData.email}, LinkedIn: ${currentFormData.linkedin || 'N/A'}, Idea: ${currentFormData.idea}. Does this look correct?`;
-    }
-
-    // Filter out initial assistant messages if they appear first in the history
-    // The Gemini API requires the first message in 'history' to be from 'user'.
-    const filteredHistory = messages.filter((msg, index) => {
-        if (index === 0 && msg.role === 'assistant') {
-            return false;
-        }
-        return true;
+    const model = genAI.getGenerativeModel({
+      model: 'models/gemini-2.5-flash-lite-preview-06-17',
     });
 
-    console.log('Attempting to start chat with history:', JSON.stringify(filteredHistory.map(msg => ({ role: msg.role, parts: msg.parts }))));
-    console.log('System Instruction being used:', systemInstructionContent);
+    const result = await model.generateContent({
+      contents: [systemInstruction, ...contents],
+      generationConfig: {
+        temperature: 0.7,
+        responseMimeType: "application/json", // Strict JSON output
+      },
+    });
 
-    let chat;
+    const rawReplyText = result.response.text();
+
+    // The markdown extraction is less critical with responseMimeType but harmless to keep.
+    let jsonString = rawReplyText;
+    const jsonMatch = rawReplyText.match(/```json\n([\s\S]*?)\n```/);
+
+    if (jsonMatch && jsonMatch[1]) {
+      jsonString = jsonMatch[1];
+    } else {
+      console.warn("Gemini response not wrapped in ```json``` (despite mimeType), attempting to parse as is:", rawReplyText);
+    }
+
+    let parsedData: ParsedLLMResponse = {
+      message: "An unexpected response was received from the AI.",
+      updates: {}
+    };
+
     try {
-        chat = model.startChat({
-            history: filteredHistory.map(msg => ({
-              role: msg.role,
-              parts: msg.parts
-            })),
-            systemInstruction: { role: 'system', parts: [{ text: systemInstructionContent }] }
-        });
-        console.log('Chat object successfully created.');
-    } catch (chatError) {
-        console.error('ERROR during model.startChat():', chatError);
-        throw new Error(`Failed to initialize chat session: ${chatError instanceof Error ? chatError.message : String(chatError)}`);
+      parsedData = JSON.parse(jsonString || '{}');
+
+      if (!parsedData.message) {
+        parsedData.message = "AI response received, but message field was empty.";
+      }
+
+    } catch (parseError: any) {
+      console.error('❌ Failed to parse final JSON string:', jsonString, parseError);
+      parsedData.message = "I'm having trouble understanding the AI's format. Please try again.";
+      parsedData.updates = {};
     }
 
-    if (!chat || typeof chat.sendMessage !== 'function') {
-        console.error('CRITICAL: Chat object is invalid or sendMessage method is missing.');
-        throw new Error('Chat session could not be properly initialized. sendMessage method is missing.');
-    }
-
-    const lastUserMessageContent = messages[messages.length - 1]?.content || '';
-    console.log('Last user message content:', lastUserMessageContent);
-
-    // Send the last user message to the chat session
-    const result = await chat.sendMessage(lastUserMessageContent);
-
-    const response = await result.response;
-    const fullText = response.text();
-
-    // --- Parsing the LLM's output for message and updates JSON ---
-    let llmMessage = fullText;
-    let updatesFromLLM: Partial<LLMManagedFormData> = {};
-
-    // Attempt to extract JSON from the end of the response
-    const jsonMatch = fullText.match(/\{[\s\S]*\}$/);
-    if (jsonMatch) {
-        try {
-            updatesFromLLM = JSON.parse(jsonMatch[0]) as Partial<LLMManagedFormData>;
-            llmMessage = fullText.substring(0, fullText.length - jsonMatch[0].length).trim();
-        } catch (e) {
-            console.warn("Could not parse JSON from LLM response:", e);
-            // Fallback: If JSON parsing fails, treat the whole response as a message.
-        }
-    }
-
-    // If LLM didn't provide a message, use our fallback
-    if (!llmMessage.trim() && assistantFallbackMessage) {
-        llmMessage = assistantFallbackMessage;
-    } else if (!llmMessage.trim()) {
-        llmMessage = "I'm not sure how to respond. Can you rephrase?";
-    }
-
-    // Ensure the response always contains both message and updates
-    return NextResponse.json<LLMResponseOutput>({
-      message: llmMessage,
-      updates: updatesFromLLM,
+    return NextResponse.json({
+      message: parsedData.message,
+      updates: parsedData.updates || {},
     });
 
-  } catch (error: any) {
-    console.error('🔥 Gemini API or Server Error:', error);
-    // Add more detailed error info if it's an internal GenerativeAI error
-    if (error.status && error.errorDetails) {
-        console.error('Error Details:', JSON.stringify(error.errorDetails));
-    }
+  } catch (err: any) {
+    console.error('🔥 Gemini API or Server Error:', err.message || err);
+
     return NextResponse.json(
-      { error: `Gemini API or Server Error: ${error.message || 'Unknown error'}` },
-      { status: error.response?.status || 500 }
+      {
+        error: err.message || 'Internal Server Error',
+        message: "Sorry, I'm having trouble connecting to the AI. Please try again in a moment!",
+        updates: {},
+      },
+      { status: 500 }
     );
   }
-  }
+}
