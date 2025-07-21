@@ -1,4 +1,3 @@
-// app/context/FormContext.tsx
 'use client';
 
 import React, { createContext, useContext, useState, ReactNode } from 'react';
@@ -10,26 +9,29 @@ export type FormData = {
   aiIdea: string;
 };
 
-type FormContextType = FormData & {
+type FormContextType = {
+  form: FormData;
   updateForm: (fields: Partial<FormData>) => void;
+};
+
+const defaultForm: FormData = {
+  name: '',
+  email: '',
+  linkedin: '',
+  aiIdea: '',
 };
 
 const FormContext = createContext<FormContextType | undefined>(undefined);
 
 export const FormProvider = ({ children }: { children: ReactNode }) => {
-  const [form, setForm] = useState<FormData>({
-    name: '',
-    email: '',
-    linkedin: '',
-    aiIdea: '',
-  });
+  const [form, setForm] = useState<FormData>(defaultForm);
 
   const updateForm = (fields: Partial<FormData>) => {
     setForm((prev) => ({ ...prev, ...fields }));
   };
 
   return (
-    <FormContext.Provider value={{ ...form, updateForm }}>
+    <FormContext.Provider value={{ form, updateForm }}>
       {children}
     </FormContext.Provider>
   );
