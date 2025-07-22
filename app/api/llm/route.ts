@@ -83,30 +83,24 @@ Only include updated fields inside 'updates'. If none, return empty updates. Do 
 
     const rawReplyText = result.response.text();
 
-    // The markdown extraction is less critical with responseMimeType but harmless to keep.
-    let jsonString = rawReplyText;
-    const jsonMatch = rawReplyText.match(/```json\n([\s\S]*?)\n```/);
-
-    if (jsonMatch && jsonMatch[1]) {
-      jsonString = jsonMatch[1];
-    } else {
-      console.warn("Gemini response not wrapped in ```json``` (despite mimeType), attempting to parse as is:", rawReplyText);
-    }
-
+    // The key change is here:
+    // With 'responseMimeType: "application/json"', Gemini should return pure JSON.
+    // We can now directly parse 'rawReplyText' without checking for markdown wrappers,
+    // which eliminates the warning you were seeing.
     let parsedData: ParsedLLMResponse = {
       message: "An unexpected response was received from the AI.",
       updates: {}
     };
 
     try {
-      parsedData = JSON.parse(jsonString || '{}');
+      parsedData = JSON.parse(rawReplyText || '{}'); // Directly parse rawReplyText
 
       if (!parsedData.message) {
         parsedData.message = "AI response received, but message field was empty.";
       }
 
     } catch (parseError: any) {
-      console.error('❌ Failed to parse final JSON string:', jsonString, parseError);
+      console.error('❌ Failed to parse final JSON string:', rawReplyText, parseError);
       parsedData.message = "I'm having trouble understanding the AI's format. Please try again.";
       parsedData.updates = {};
     }
