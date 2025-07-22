@@ -3,8 +3,8 @@
 import { useFormContext } from './FormContext';
 
 export default function AgentForm() {
-  const { name, email, linkedin, aiIdea, updateForm } = useFormContext();
-
+  const { form, updateForm } = useFormContext();
+const { name, email, linkedin, aiIdea } = form;
   return (
     <form className="space-y-4 p-4 max-w-xl mx-auto">
       <input
