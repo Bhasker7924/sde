@@ -1,44 +1,46 @@
+// app/components/FormContext.tsx
 'use client';
 
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import { createContext, useContext, useState, ReactNode } from 'react';
 
-export type FormState = {
+// Make sure to export FormData
+export type FormData = {
   name: string;
   email: string;
-  linkedin: string;
-  aiIdea: string;
+  linkedin: string; // Keep this as 'linkedin' to match AgentForm
+  idea: string;
+  // REMOVE THESE TWO LINES:
+  // aiIdea?: string;
+  // LinkedIn?: string;
 };
 
-type FormContextType = {
-  form: FormState;
-  updateForm: (updates: Partial<FormState>) => void;
-};
-
-const defaultFormState: FormState = {
+const defaultForm: FormData = {
   name: '',
   email: '',
-  linkedin: '',
-  aiIdea: '',
+  linkedin: '', // Keep this as 'linkedin' to match AgentForm
+  idea: '',
 };
 
-const FormContext = createContext<FormContextType | undefined>(undefined);
+export const FormContext = createContext<{
+  formData: FormData;
+  updateForm: (updates: Partial<FormData>) => void;
+}>({
+  formData: defaultForm,
+  updateForm: () => {},
+});
+
+export const useFormContext = () => useContext(FormContext);
 
 export const FormProvider = ({ children }: { children: ReactNode }) => {
-  const [form, setForm] = useState<FormState>(defaultFormState);
+  const [formData, setFormData] = useState<FormData>(defaultForm);
 
-  const updateForm = (updates: Partial<FormState>) => {
-    setForm(prev => ({ ...prev, ...updates }));
+  const updateForm = (updates: Partial<FormData>) => {
+    setFormData((prev) => ({ ...prev, ...updates }));
   };
 
   return (
-    <FormContext.Provider value={{ form, updateForm }}>
+    <FormContext.Provider value={{ formData, updateForm }}>
       {children}
     </FormContext.Provider>
   );
-};
-
-export const useFormContext = (): FormContextType => {
-  const context = useContext(FormContext);
-  if (!context) throw new Error('useFormContext must be used within FormProvider');
-  return context;
 };

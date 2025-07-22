@@ -3,8 +3,8 @@
 import { useFormContext } from './FormContext';
 
 export default function AgentForm() {
-  const { form, updateForm } = useFormContext();
-const { name, email, linkedin, aiIdea } = form;
+  const { formData, updateForm } = useFormContext();
+const { name, email, linkedin, idea } = formData;
   return (
     <form className="space-y-4 p-4 max-w-xl mx-auto">
       <input
@@ -30,8 +30,8 @@ const { name, email, linkedin, aiIdea } = form;
       />
       <textarea
         placeholder="Your AI Agent Idea"
-        value={aiIdea}
-        onChange={(e) => updateForm({ aiIdea: e.target.value })}
+        value={idea}
+        onChange={(e) => updateForm({ idea: e.target.value })}
         className="w-full p-2 border rounded text-black"
       />
     </form>

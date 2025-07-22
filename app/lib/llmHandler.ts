@@ -1,56 +1,76 @@
 // app/lib/llmHandler.ts
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { FormState } from '../components/FormContext';
+import type { Content } from '@google/generative-ai';
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
-const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
-
-const fieldOrder = ['name', 'email', 'linkedin', 'aiIdea'] as const;
-
-function extractField(content: string, key: string): string {
-  const regex = new RegExp(`${key}\\s*[:\\-]?\\s*(.*)`, 'i');
-  const match = content.match(regex);
-  return match?.[1]?.trim() || '';
+if (!process.env.GOOGLE_API_KEY) {
+  throw new Error('❌ GOOGLE_API_KEY is required in .env.local');
 }
 
-export async function callGeminiAPI(messages: { role: string; parts: string }[], form: FormState): Promise<string> {
+const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
+const MODEL = 'gemini-1.5-flash-latest';
+const FORM_FIELDS = ['name', 'email', 'linkedin', 'aiIdea'] as const;
+
+type FormState = {
+  name?: string;
+  email?: string;
+  linkedin?: string;
+  aiIdea?: string;
+};
+
+export async function getLLMResponse(
+  conversation: Content[],
+  currentForm: FormState
+) {
   try {
-    const chat = await model.startChat({
-      history: messages.map(m => ({
-        role: m.role as 'user' | 'model',
-        parts: [{ text: m.parts }],
-      })),
-      generationConfig: { temperature: 0.7 },
-    });
+    const model = genAI.getGenerativeModel({ model: MODEL });
 
-    const prompt = `
-You're an AI Copilot helping fill a job application form.
-Extract only what's new from user input. Current values are:
-
-Name: ${form.name || '[empty]'}
-Email: ${form.email || '[empty]'}
-LinkedIn: ${form.linkedin || '[empty]'}
-AI Idea: ${form.aiIdea || '[empty]'}
-
-If the form is fully filled, respond with a summary like:
-"Here's what I got:
-- Name: ...
-- Email: ...
-- LinkedIn: ...
-- AI Idea: ...
-Let me know if you'd like to edit anything."
-
-If it's incomplete, ask only the missing fields.
+    const systemPrompt = `
+You are a helpful Copilot. The form fields are ${FORM_FIELDS.join(', ')}.
+Current filled fields: ${JSON.stringify(currentForm)}.
+Only ask for one missing field at a time in natural language.
+Validate email format and LinkedIn URL format. Always return JSON:
+{
+ "message": "...",
+ "updates": { <field>: "<value>" }
+}
 `;
 
-    const result = await chat.sendMessage(prompt);
-    const response = await result.response.text();
+    const contents: Content[] = [
+      { role: 'user', parts: [{ text: systemPrompt }] },
+      ...conversation,
+    ];
 
-    if (!response) return 'Sorry, I didn’t catch that. Can you try again?';
+    const resp = await model.generateContent({ contents, generationConfig: { maxOutputTokens: 256 } });
+    const text = resp.response.text().trim();
 
-    return response;
-  } catch (err) {
+    let parsed;
+    try {
+      parsed = JSON.parse(text);
+      if (!parsed.message || typeof parsed.updates !== 'object') throw new Error();
+    } catch {
+      console.error('Invalid JSON from Gemini:', text);
+      return {
+        message: "Sorry, I didn't understand that. Could you rephrase?",
+        updates: {},
+      };
+    }
+
+    // Validate email if updated
+    if (parsed.updates.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(parsed.updates.email)) {
+      return { message: "That doesn't look like a valid email. Try again.", updates: {} };
+    }
+
+    // Validate LinkedIn if updated
+    if (parsed.updates.linkedin && !parsed.updates.linkedin.startsWith('http')) {
+      return { message: "Please provide a valid LinkedIn URL (starting with https://).", updates: {} };
+    }
+
+    return parsed;
+  } catch (err: any) {
     console.error('Gemini API error:', err);
-    return 'Sorry, something went wrong while processing your input.';
+    return {
+      message: "Oops, something went wrong. Try again in a moment.",
+      updates: {},
+    };
   }
 }
