@@ -1,69 +1,50 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { FormData } from '../components/FormContext';
+import { FormDataType } from '../context/FormContext';
 
-const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY || '');
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 
 const SYSTEM_PROMPT = `
-You are a helpful assistant designed to extract four fields from user input:
-- name
-- email
-- linkedin
-- aiIdea
+You are a helpful assistant that helps users fill out a form with the following fields:
+- Name
+- Email
+- LinkedIn
+- AI Idea
 
-Use this JSON format only:
-{
-  "name": "",
-  "email": "",
-  "linkedin": "",
-  "aiIdea": ""
-}
-Only update fields the user explicitly mentions.
+Extract structured data from user input and return only the updated fields.
 `;
 
-function extractFieldsFromResponse(text: string): Partial<FormData> {
-  try {
-    const jsonMatch = text.match(/{[\s\S]*}/);
-    if (!jsonMatch) return {};
-    const parsed = JSON.parse(jsonMatch[0]);
-    return {
-      name: parsed.name || '',
-      email: parsed.email || '',
-      linkedin: parsed.linkedin || '',
-      aiIdea: parsed.aiIdea || '',
-    };
-  } catch (err) {
-    console.error('Error parsing Gemini output:', err);
-    return {};
-  }
+export async function callGeminiAPI(
+  messages: { role: 'user' | 'model'; parts: string }[]
+): Promise<Partial<FormDataType>> {
+  const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
+
+  const chatHistory = [
+    { text: SYSTEM_PROMPT },
+    ...messages.map((msg) => ({ text: msg.parts }))
+  ];
+
+  const result = await model.generateContent(chatHistory);
+  const response = await result.response.text();
+
+  return extractFieldsFromResponse(response);
 }
 
-export async function callGeminiAPI(
-  messages: { role: 'user' | 'model'; parts: string }[]
-): Promise<Partial<FormData>> {
-  try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
+function extractFieldsFromResponse(response: string): Partial<FormDataType> {
+  const updates: Partial<FormDataType> = {};
+  const lines = response.split('\n');
 
-    // Properly format each message to fit Content[]
-    const formattedMessages = messages.map((msg) => ({
-      role: msg.role,
-      parts: [{ text: msg.parts }],
-    }));
+  for (let line of lines) {
+    line = line.trim();
+    if (line.toLowerCase().startsWith('name:')) {
+      updates.name = line.split(':')[1].trim();
+    } else if (line.toLowerCase().startsWith('email:')) {
+      updates.email = line.split(':')[1].trim();
+    } else if (line.toLowerCase().startsWith('linkedin:')) {
+      updates.linkedin = line.split(':')[1].trim();
+    } else if (line.toLowerCase().startsWith('idea:')) {
+      updates.aiIdea = line.split(':')[1].trim();
+    }
+  }
 
-    // Now prepend the system prompt as a user message
-    const chatHistory = [
-      {
-        role: 'user',
-        parts: [{ text: SYSTEM_PROMPT }],
-      },
-      ...formattedMessages,
-    ];
-
-    const result = await model.generateContent(chatHistory);
-    const response = await result.response.text();
-
-    return extractFieldsFromResponse(response);
-  } catch (error) {
-    console.error('Gemini API Error:', error);
-    return {};
-  }
+  return updates;
 }
