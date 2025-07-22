@@ -1,5 +1,5 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { FormDataType } from '../components/FormContext';
+import { FormData } from '../components/FormContext';
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 
@@ -15,7 +15,7 @@ Extract structured data from user input and return only the updated fields.
 
 export async function callGeminiAPI(
   messages: { role: 'user' | 'model'; parts: string }[]
-): Promise<Partial<FormDataType>> {
+): Promise<Partial<FormData>> {
   const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
 
   const chatHistory = [
@@ -29,8 +29,8 @@ export async function callGeminiAPI(
   return extractFieldsFromResponse(response);
 }
 
-function extractFieldsFromResponse(response: string): Partial<FormDataType> {
-  const updates: Partial<FormDataType> = {};
+function extractFieldsFromResponse(response: string): Partial<FormData> {
+  const updates: Partial<FormData> = {};
   const lines = response.split('\n');
 
   for (let line of lines) {
