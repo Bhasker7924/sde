@@ -1,102 +1,96 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useFormContext } from './FormContext';
 import { callGeminiAPI } from '../lib/llmHandler';
 
+type Message = { role: 'user' | 'model'; content: string };
+
 export default function CopilotUI() {
-  const [input, setInput] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [history, setHistory] = useState([
-    {
-      role: 'assistant',
-      parts: 'Hi! I’m your AI Copilot. Tell me about yourself and your AI idea.',
-    },
+  const { form, updateForm } = useFormContext();
+  const [messages, setMessages] = useState<Message[]>([
+    { role: 'model', content: "Hi! I’m your AI Copilot. Tell me about yourself and your AI idea." },
   ]);
+  const [input, setInput] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const { formData, updateFormData } = useFormContext();
-  const chatEndRef = useRef<HTMLDivElement>(null);
+  const handleSend = async () => {
+    if (!input.trim()) return;
+    const userMsg: Message = { role: 'user', content: input };
+    setMessages(prev => [...prev, userMsg]);
+    setInput('');
+    setLoading(true);
 
-  const scrollToBottom = () => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const payload = {
+      role: 'user',
+      parts: input,
+    };
+
+    const response = await callGeminiAPI([payload], form);
+    setMessages(prev => [...prev, { role: 'model', content: response }]);
+    setLoading(false);
+
+    updateForm(parseExtractedFields(response));
   };
 
-  useEffect(scrollToBottom, [history]);
+  const parseExtractedFields = (text: string): Partial<typeof form> => {
+    const updates: Partial<typeof form> = {};
+    if (/name\s*[:\-]/i.test(text)) updates.name = extract(text, 'name');
+    if (/email\s*[:\-]/i.test(text)) updates.email = extract(text, 'email');
+    if (/linkedin\s*[:\-]/i.test(text)) updates.linkedin = extract(text, 'linkedin');
+    if (/idea|ai idea\s*[:\-]/i.test(text)) updates.aiIdea = extract(text, 'ai idea') || extract(text, 'idea');
+    return updates;
+  };
 
-  const allFieldsFilled = formData.name && formData.email && formData.linkedin && formData.aiIdea;
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!input.trim()) return;
-
-    const userMessage = { role: 'user', parts: input };
-    const newHistory = [...history, userMessage];
-    setHistory(newHistory);
-    setInput('');
-    setIsLoading(true);
-
-    try {
-      const fieldUpdates = await callGeminiAPI(
-        newHistory.map(msg => ({
-          role: msg.role === 'assistant' ? 'model' : msg.role,
-          parts: msg.parts,
-        }))
-      );
-
-      if (fieldUpdates) updateFormData(fieldUpdates);
-
-      let response = '';
-      if (allFieldsFilled || (
-        fieldUpdates.name &&
-        fieldUpdates.email &&
-        fieldUpdates.linkedin &&
-        fieldUpdates.aiIdea
-      )) {
-        const summary = `Here's what I got:\n- Name: ${fieldUpdates.name || formData.name}\n- Email: ${fieldUpdates.email || formData.email}\n- LinkedIn: ${fieldUpdates.linkedin || formData.linkedin}\n- AI Idea: ${fieldUpdates.aiIdea || formData.aiIdea}\nWould you like to edit any field?`;
-        response = summary;
-      } else {
-        response = fieldUpdates.response || "Thanks! Tell me more.";
-      }
-
-      setHistory([...newHistory, { role: 'assistant', parts: response }]);
-    } catch (error) {
-      console.error('LLM Error:', error);
-      setHistory([
-        ...newHistory,
-        { role: 'assistant', parts: 'Sorry, something went wrong while processing your input.' },
-      ]);
-    } finally {
-      setIsLoading(false);
-    }
+  const extract = (text: string, key: string) => {
+    const match = text.match(new RegExp(`${key}\\s*[:\\-]?\\s*(.+)`, 'i'));
+    return match?.[1]?.split('\n')[0]?.trim() || '';
   };
 
   return (
-    <div className="bg-white text-black p-4 rounded-2xl shadow-lg max-w-2xl mx-auto space-y-3">
-      <div className="h-[400px] overflow-y-auto space-y-2 p-2 border rounded-lg bg-gray-50">
-        {history.map((msg, i) => (
-          <div key={i} className={`text-sm p-2 rounded-md ${msg.role === 'user' ? 'text-blue-800 bg-blue-100' : 'text-green-800 bg-green-100'}`}>
-            <span className="font-bold">{msg.role === 'user' ? '🧑 You' : '🤖 Copilot'}:</span> {msg.parts}
+    <div className="max-w-2xl mx-auto p-4 bg-white rounded-xl shadow-md">
+      <h2 className="text-xl font-semibold mb-2">AI Copilot</h2>
+      <div className="space-y-3 max-h-96 overflow-y-auto mb-4 border p-3 rounded bg-gray-50">
+        {messages.map((msg, i) => (
+          <div key={i} className={msg.role === 'user' ? 'text-right' : 'text-left'}>
+            <span className="inline-block px-3 py-2 rounded-lg"
+              style={{
+                background: msg.role === 'user' ? '#dcfce7' : '#e0f2fe',
+                color: '#000',
+                maxWidth: '90%',
+              }}
+            >
+              {msg.role === 'user' ? '🧑 ' : '🤖 '}
+              {msg.content}
+            </span>
           </div>
         ))}
-        <div ref={chatEndRef} />
+        {loading && <div className="text-left text-gray-500">🤖 Typing...</div>}
       </div>
 
-      <form onSubmit={handleSubmit} className="flex gap-2">
+      <div className="flex items-center space-x-2">
         <input
-          type="text"
+          className="flex-1 p-2 border rounded"
+          placeholder="Type your response..."
           value={input}
           onChange={e => setInput(e.target.value)}
-          className="flex-1 p-2 border rounded-lg"
-          placeholder="Say something..."
+          onKeyDown={e => e.key === 'Enter' && handleSend()}
         />
         <button
-          type="submit"
-          disabled={isLoading}
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg disabled:opacity-50"
+          onClick={handleSend}
+          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded"
         >
-          {isLoading ? 'Thinking...' : 'Send'}
+          Send
         </button>
-      </form>
+      </div>
+
+      {/* Display collected values */}
+      <div className="mt-4 bg-gray-100 p-3 rounded text-sm">
+        <p><strong>Name:</strong> {form.name}</p>
+        <p><strong>Email:</strong> {form.email}</p>
+        <p><strong>LinkedIn:</strong> {form.linkedin}</p>
+        <p><strong>AI Idea:</strong> {form.aiIdea}</p>
+      </div>
     </div>
   );
 }

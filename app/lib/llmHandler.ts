@@ -1,35 +1,56 @@
+// app/lib/llmHandler.ts
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { FormData } from '../components/FormContext';
+import { FormState } from '../components/FormContext';
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
 
-export async function callGeminiAPI(
-  messages: { role: 'user' | 'model'; parts: string }[]
-): Promise<Partial<FormData> & { response?: string }> {
+const fieldOrder = ['name', 'email', 'linkedin', 'aiIdea'] as const;
+
+function extractField(content: string, key: string): string {
+  const regex = new RegExp(`${key}\\s*[:\\-]?\\s*(.*)`, 'i');
+  const match = content.match(regex);
+  return match?.[1]?.trim() || '';
+}
+
+export async function callGeminiAPI(messages: { role: string; parts: string }[], form: FormState): Promise<string> {
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
+    const chat = await model.startChat({
+      history: messages.map(m => ({
+        role: m.role as 'user' | 'model',
+        parts: [{ text: m.parts }],
+      })),
+      generationConfig: { temperature: 0.7 },
+    });
 
-    const chat = model.startChat({ history: messages });
+    const prompt = `
+You're an AI Copilot helping fill a job application form.
+Extract only what's new from user input. Current values are:
 
-    const userMessage = messages[messages.length - 1]?.parts || 'Tell me about yourself';
-    const result = await chat.sendMessage(userMessage);
-    const reply = result.response.text();
+Name: ${form.name || '[empty]'}
+Email: ${form.email || '[empty]'}
+LinkedIn: ${form.linkedin || '[empty]'}
+AI Idea: ${form.aiIdea || '[empty]'}
 
-    const extracted: Partial<FormData> = {};
+If the form is fully filled, respond with a summary like:
+"Here's what I got:
+- Name: ...
+- Email: ...
+- LinkedIn: ...
+- AI Idea: ...
+Let me know if you'd like to edit anything."
 
-    const extract = (label: keyof FormData, regex: RegExp) => {
-      const match = reply.match(regex);
-      if (match) extracted[label] = match[1].trim();
-    };
+If it's incomplete, ask only the missing fields.
+`;
 
-    extract('name', /(?:Name|name)\s*[:\-–]\s*(.+)/i);
-    extract('email', /(?:Email|email)\s*[:\-–]\s*([\w.-]+@[\w.-]+\.\w+)/i);
-    extract('linkedin', /(?:LinkedIn|linkedin)\s*[:\-–]\s*(https?:\/\/[^\s]+)/i);
-    extract('aiIdea', /(?:Idea|AI Idea|ai idea)\s*[:\-–]\s*(.+)/i);
+    const result = await chat.sendMessage(prompt);
+    const response = await result.response.text();
 
-    return { ...extracted, response: reply };
+    if (!response) return 'Sorry, I didn’t catch that. Can you try again?';
+
+    return response;
   } catch (err) {
-    console.error('Gemini API Error:', err);
-    return { response: 'Sorry, something went wrong.' };
+    console.error('Gemini API error:', err);
+    return 'Sorry, something went wrong while processing your input.';
   }
 }
