@@ -42,7 +42,7 @@ export default function CopilotUI() {
       const fieldUpdates = await callGeminiAPI(
         newHistory.map((msg) => ({
           role: msg.role === 'assistant' ? 'model' : 'user',
-          parts: [{ text: msg.parts }],
+          parts: msg.parts,
         }))
       );
 
