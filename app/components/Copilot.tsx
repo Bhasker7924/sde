@@ -40,11 +40,12 @@ export default function CopilotUI() {
 
     try {
       const fieldUpdates = await callGeminiAPI(
-        newHistory.map((msg) => ({
-          role: msg.role === 'assistant' ? 'model' : 'user',
-          parts: msg.parts,
-        }))
-      );
+  newHistory.map((msg) => ({
+    role: msg.role === 'assistant' ? 'model' : 'user',
+    parts: msg.parts, // msg.parts is already a string
+  }))
+);
+
 
       updateForm(fieldUpdates);
 
