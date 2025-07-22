@@ -1,130 +1,102 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useFormContext } from './FormContext';
 import { callGeminiAPI } from '../lib/llmHandler';
 
-type ChatMessage = {
-  role: 'user' | 'assistant';
-  parts: string;
-};
-
 export default function CopilotUI() {
-  const [messages, setMessages] = useState<ChatMessage[]>([
+  const [input, setInput] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [history, setHistory] = useState([
     {
       role: 'assistant',
       parts: 'Hi! I’m your AI Copilot. Tell me about yourself and your AI idea.',
     },
   ]);
-  const [input, setInput] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const { form, updateForm } = useFormContext();
+
+  const { formData, updateFormData } = useFormContext();
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
+  useEffect(scrollToBottom, [history]);
 
-  const handleSend = async () => {
+  const allFieldsFilled = formData.name && formData.email && formData.linkedin && formData.aiIdea;
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     if (!input.trim()) return;
 
-    const newUserMessage: ChatMessage = { role: 'user', parts: input };
-    const newHistory = [...messages, newUserMessage];
-    setMessages(newHistory);
+    const userMessage = { role: 'user', parts: input };
+    const newHistory = [...history, userMessage];
+    setHistory(newHistory);
     setInput('');
     setIsLoading(true);
 
     try {
       const fieldUpdates = await callGeminiAPI(
-  newHistory.map((msg) => ({
-    role: msg.role === 'assistant' ? 'model' : 'user',
-    parts: msg.parts, // msg.parts is already a string
-  }))
-);
+        newHistory.map(msg => ({
+          role: msg.role === 'assistant' ? 'model' : msg.role,
+          parts: msg.parts,
+        }))
+      );
 
+      if (fieldUpdates) updateFormData(fieldUpdates);
 
-      updateForm(fieldUpdates);
-
-      const filledFields = Object.entries(fieldUpdates)
-        .filter(([, value]) => value)
-        .map(([key, value]) => `${key}: ${value}`)
-        .join('\n');
-
-      const allFilled =
+      let response = '';
+      if (allFieldsFilled || (
         fieldUpdates.name &&
         fieldUpdates.email &&
         fieldUpdates.linkedin &&
-        fieldUpdates.aiIdea;
+        fieldUpdates.aiIdea
+      )) {
+        const summary = `Here's what I got:\n- Name: ${fieldUpdates.name || formData.name}\n- Email: ${fieldUpdates.email || formData.email}\n- LinkedIn: ${fieldUpdates.linkedin || formData.linkedin}\n- AI Idea: ${fieldUpdates.aiIdea || formData.aiIdea}\nWould you like to edit any field?`;
+        response = summary;
+      } else {
+        response = fieldUpdates.response || "Thanks! Tell me more.";
+      }
 
-      const botReply = allFilled
-        ? `Great! Here’s what I got:\n\n${filledFields}\n\nLet me know if you'd like to edit anything.`
-        : 'Got it. Tell me more or continue filling in the details.';
-
-      setMessages((prev) => [
-        ...prev,
-        { role: 'assistant', parts: botReply },
-      ]);
+      setHistory([...newHistory, { role: 'assistant', parts: response }]);
     } catch (error) {
-      console.error('Error calling Gemini API:', error);
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: 'assistant',
-          parts: 'Sorry, something went wrong while processing your input.',
-        },
+      console.error('LLM Error:', error);
+      setHistory([
+        ...newHistory,
+        { role: 'assistant', parts: 'Sorry, something went wrong while processing your input.' },
       ]);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSend();
-    }
-  };
-
   return (
-    <div className="bg-gray-100 rounded-xl shadow p-4 max-w-xl w-full mx-auto mt-6">
-      <div className="h-96 overflow-y-auto space-y-4 p-2 bg-white rounded-md border">
-        {messages.map((msg, index) => (
-          <div
-            key={index}
-            className={`${
-              msg.role === 'assistant' ? 'text-gray-900' : 'text-blue-700'
-            } whitespace-pre-wrap`}
-          >
-            <strong>{msg.role === 'assistant' ? '🤖 Copilot' : '🧑 You'}:</strong>{' '}
-            {msg.parts}
+    <div className="bg-white text-black p-4 rounded-2xl shadow-lg max-w-2xl mx-auto space-y-3">
+      <div className="h-[400px] overflow-y-auto space-y-2 p-2 border rounded-lg bg-gray-50">
+        {history.map((msg, i) => (
+          <div key={i} className={`text-sm p-2 rounded-md ${msg.role === 'user' ? 'text-blue-800 bg-blue-100' : 'text-green-800 bg-green-100'}`}>
+            <span className="font-bold">{msg.role === 'user' ? '🧑 You' : '🤖 Copilot'}:</span> {msg.parts}
           </div>
         ))}
-        {isLoading && (
-          <div className="text-gray-500 italic animate-pulse">Typing...</div>
-        )}
         <div ref={chatEndRef} />
       </div>
-      <div className="mt-4 flex">
-        <textarea
-          className="flex-1 rounded-md border p-2 resize-none"
-          rows={2}
-          placeholder="Type your message..."
+
+      <form onSubmit={handleSubmit} className="flex gap-2">
+        <input
+          type="text"
           value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={handleKeyDown}
+          onChange={e => setInput(e.target.value)}
+          className="flex-1 p-2 border rounded-lg"
+          placeholder="Say something..."
         />
         <button
-          onClick={handleSend}
+          type="submit"
           disabled={isLoading}
-          className="ml-2 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 disabled:opacity-50"
+          className="bg-blue-600 text-white px-4 py-2 rounded-lg disabled:opacity-50"
         >
-          Send
+          {isLoading ? 'Thinking...' : 'Send'}
         </button>
-      </div>
+      </form>
     </div>
   );
 }
