@@ -1,3 +1,4 @@
+// app/api/llm/route.ts
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { NextRequest, NextResponse } from 'next/server';
 
@@ -59,7 +60,7 @@ Always return JSON format:
   "updates": {
     "name": "Priya",
     "email": "priya@example.com",
-    "linkedin": "https://linkedin.com/in/priya",
+    "linkedin": "[https://linkedin.com/in/priya](https://linkedin.com/in/priya)",
     "aiIdea": "A system for personalized learning paths"
   }
 }
@@ -77,30 +78,38 @@ Only include updated fields inside 'updates'. If none, return empty updates. Do 
       contents: [systemInstruction, ...contents],
       generationConfig: {
         temperature: 0.7,
-        responseMimeType: "application/json", // Strict JSON output
+        responseMimeType: "application/json", // Still request strict JSON output
       },
     });
 
     const rawReplyText = result.response.text();
 
-    // The key change is here:
-    // With 'responseMimeType: "application/json"', Gemini should return pure JSON.
-    // We can now directly parse 'rawReplyText' without checking for markdown wrappers,
-    // which eliminates the warning you were seeing.
+    // --- REVERTED CHANGE START ---
+    let jsonString = rawReplyText;
+    const jsonMatch = rawReplyText.match(/```json\n([\s\S]*?)\n```/);
+
+    if (jsonMatch && jsonMatch[1]) {
+      jsonString = jsonMatch[1];
+    } else {
+      // This warning will reappear, but it indicates the fallback is in use, which is necessary.
+      console.warn("Gemini response not wrapped in ```json``` (despite mimeType), attempting to parse as is:", rawReplyText);
+    }
+    // --- REVERTED CHANGE END ---
+
     let parsedData: ParsedLLMResponse = {
       message: "An unexpected response was received from the AI.",
       updates: {}
     };
 
     try {
-      parsedData = JSON.parse(rawReplyText || '{}'); // Directly parse rawReplyText
+      parsedData = JSON.parse(jsonString || '{}'); // Parse the potentially extracted string
 
       if (!parsedData.message) {
         parsedData.message = "AI response received, but message field was empty.";
       }
 
     } catch (parseError: any) {
-      console.error('❌ Failed to parse final JSON string:', rawReplyText, parseError);
+      console.error('❌ Failed to parse final JSON string:', jsonString, parseError);
       parsedData.message = "I'm having trouble understanding the AI's format. Please try again.";
       parsedData.updates = {};
     }
