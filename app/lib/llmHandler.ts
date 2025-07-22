@@ -3,48 +3,33 @@ import { FormData } from '../components/FormContext';
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 
-const SYSTEM_PROMPT = `
-You are a helpful assistant that helps users fill out a form with the following fields:
-- Name
-- Email
-- LinkedIn
-- AI Idea
-
-Extract structured data from user input and return only the updated fields.
-`;
-
 export async function callGeminiAPI(
   messages: { role: 'user' | 'model'; parts: string }[]
-): Promise<Partial<FormData>> {
-  const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
+): Promise<Partial<FormData> & { response?: string }> {
+  try {
+    const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
 
-  const chatHistory = [
-    { text: SYSTEM_PROMPT },
-    ...messages.map((msg) => ({ text: msg.parts }))
-  ];
+    const chat = model.startChat({ history: messages });
 
-  const result = await model.generateContent(chatHistory);
-  const response = await result.response.text();
+    const userMessage = messages[messages.length - 1]?.parts || 'Tell me about yourself';
+    const result = await chat.sendMessage(userMessage);
+    const reply = result.response.text();
 
-  return extractFieldsFromResponse(response);
-}
+    const extracted: Partial<FormData> = {};
 
-function extractFieldsFromResponse(response: string): Partial<FormData> {
-  const updates: Partial<FormData> = {};
-  const lines = response.split('\n');
+    const extract = (label: keyof FormData, regex: RegExp) => {
+      const match = reply.match(regex);
+      if (match) extracted[label] = match[1].trim();
+    };
 
-  for (let line of lines) {
-    line = line.trim();
-    if (line.toLowerCase().startsWith('name:')) {
-      updates.name = line.split(':')[1].trim();
-    } else if (line.toLowerCase().startsWith('email:')) {
-      updates.email = line.split(':')[1].trim();
-    } else if (line.toLowerCase().startsWith('linkedin:')) {
-      updates.linkedin = line.split(':')[1].trim();
-    } else if (line.toLowerCase().startsWith('idea:')) {
-      updates.aiIdea = line.split(':')[1].trim();
-    }
+    extract('name', /(?:Name|name)\s*[:\-–]\s*(.+)/i);
+    extract('email', /(?:Email|email)\s*[:\-–]\s*([\w.-]+@[\w.-]+\.\w+)/i);
+    extract('linkedin', /(?:LinkedIn|linkedin)\s*[:\-–]\s*(https?:\/\/[^\s]+)/i);
+    extract('aiIdea', /(?:Idea|AI Idea|ai idea)\s*[:\-–]\s*(.+)/i);
+
+    return { ...extracted, response: reply };
+  } catch (err) {
+    console.error('Gemini API Error:', err);
+    return { response: 'Sorry, something went wrong.' };
   }
-
-  return updates;
 }
