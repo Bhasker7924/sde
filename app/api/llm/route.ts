@@ -52,19 +52,21 @@ export async function POST(req: NextRequest) {
 - linkedin (as 'linkedin')
 - AI idea (as 'aiIdea')
 
+**Your primary goal is to extract these 4 pieces of information.**
 Extract values directly from conversation. If the user says "Hi this is Priya", extract name: "Priya". Only enter the value, not the entire sentence.
-Reply naturally but only once with things like "Nice to meet you."
+Only ask for one piece of missing information at a time. If you have extracted all 4 fields, your 'message' should confirm completion and offer a next step, like "Great! I have all your details. Is there anything else I can help with?" or "Thanks for providing all the information!". Do NOT ask for already collected information again in the message.
+
 Always return JSON format:
 {
-  "message": "Thanks! What's your email?",
-  "updates": {
+  "message": "...", // The conversational reply
+  "updates": { // Only include updated fields here. If no new updates, this should be empty.
     "name": "Priya",
     "email": "priya@example.com",
-    "linkedin": "[https://linkedin.com/in/priya](https://linkedin.com/in/priya)",
+    "linkedin": "https://linkedin.com/in/priya",
     "aiIdea": "A system for personalized learning paths"
   }
 }
-Only include updated fields inside 'updates'. If none, return empty updates. Do not repeat fields. Always return valid JSON.`,
+Always return valid JSON.`,
           },
         ],
       };
@@ -84,7 +86,7 @@ Only include updated fields inside 'updates'. If none, return empty updates. Do 
 
     const rawReplyText = result.response.text();
 
-    // --- REVERTED CHANGE START ---
+    // Reverting to robust parsing that handles both pure JSON and JSON wrapped in markdown
     let jsonString = rawReplyText;
     const jsonMatch = rawReplyText.match(/```json\n([\s\S]*?)\n```/);
 
@@ -94,7 +96,6 @@ Only include updated fields inside 'updates'. If none, return empty updates. Do 
       // This warning will reappear, but it indicates the fallback is in use, which is necessary.
       console.warn("Gemini response not wrapped in ```json``` (despite mimeType), attempting to parse as is:", rawReplyText);
     }
-    // --- REVERTED CHANGE END ---
 
     let parsedData: ParsedLLMResponse = {
       message: "An unexpected response was received from the AI.",
