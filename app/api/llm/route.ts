@@ -32,6 +32,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { messages, formData } = body;
 
+    // Basic input validation
     if (!messages || !Array.isArray(messages)) {
       return NextResponse.json({ message: "Invalid messages array.", updates: {} }, { status: 400 });
     }
@@ -39,13 +40,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ message: "Invalid formData object.", updates: {} }, { status: 400 });
     }
 
+    // Map incoming messages to the Content type required by GoogleGenerativeAI
     const contents: Content[] = messages.map((msg: any) => ({
-      role: msg.role === 'user' ? 'user' : 'model',
+      role: msg.role === 'user' ? 'user' : 'model', // Ensure roles are 'user' or 'model'
       parts: [{ text: msg.content }],
     }));
 
+    // --- Core System Instruction for the LLM's behavior ---
     const systemInstruction: Content = {
-      role: 'user',
+      role: 'user', // System instructions are often provided as an initial user turn
       parts: [
         {
           text: `You are a friendly AI Copilot guiding a user through a form with four distinct states: **Collecting**, **Reviewing**, and **Submitting**.
@@ -94,7 +97,7 @@ ${JSON.stringify(formData)}
    - **Action:**
      - Your 'message' should be a final confirmation like: "Perfect! Submitting your information now. Thank you!"
      - Your JSON response MUST include the flag **"isSubmissionReady": true**. This signals the UI to automatically submit the form.
-     - **Crucially: The 'updates' object should be an empty object `{}` in this state, as no further form updates are expected from the AI.**
+     - **Crucially: The 'updates' object should be an empty object \`{}\` in this state, as no further form updates are expected from the AI.**
 
 ---
 
@@ -122,11 +125,12 @@ Always return a valid JSON object. Do NOT include any other text, explanations, 
       model: MODEL,
     });
 
+    // Generate content using the system instruction and conversation history
     const result = await model.generateContent({
       contents: [systemInstruction, ...contents],
       generationConfig: {
         temperature: 0.5,
-        responseMimeType: "application/json",
+        responseMimeType: "application/json", // Crucial for instructing JSON output
       },
     });
 
@@ -134,50 +138,55 @@ Always return a valid JSON object. Do NOT include any other text, explanations, 
     let parsedData: ParsedLLMResponse;
 
     try {
-      // FIX 1: Clean the LLM response by removing markdown code block delimiters
+      // FIX: Clean the LLM response by removing markdown code block delimiters if present.
+      // This handles cases where the LLM might wrap its JSON in ```json...```
       const cleanedReplyText = rawReplyText
-        .replace(/^```json\s*/, '')
-        .replace(/\s*```$/, '')
-        .trim();
+        .replace(/^```json\s*/, '') // Remove '```json' at the start
+        .replace(/\s*```$/, '')     // Remove '```' at the end
+        .trim();                    // Trim any leftover whitespace
 
       parsedData = JSON.parse(cleanedReplyText);
 
-      // FIX 2: Validate structure, allowing 'updates' to be optional only when submitting
+      // FIX: Validate the structure of the parsed response.
+      // 'message' is always required.
       if (typeof parsedData.message !== 'string') {
         throw new Error('LLM response missing "message" string.');
       }
 
-      // If not in submission state, 'updates' must be an object
-      // If in submission state, 'updates' can be optional or empty, but we ensure it's an object.
+      // 'updates' is expected to be an object. If isSubmissionReady is true,
+      // the LLM might omit 'updates', so we ensure it's an empty object for consistency.
       if (parsedData.isSubmissionReady) {
         parsedData.updates = {}; // Force empty updates object on submission
       } else if (typeof parsedData.updates !== 'object') {
-          throw new Error('LLM response missing "updates" object when not submitting.');
+          // If not submitting and updates is not an object, it's an invalid structure.
+          throw new Error('LLM response missing or invalid "updates" object when not submitting.');
       }
 
     } catch (parseError) {
       console.error('❌ Failed to parse JSON from Gemini or invalid structure:', rawReplyText, parseError);
       return NextResponse.json({
         message: "I'm having a little trouble understanding my own thoughts right now. Could you please rephrase that?",
-        updates: {},
-      }, { status: 500 });
+        updates: {}, // Return empty updates to prevent frontend errors
+      }, { status: 500 }); // 500 status for internal AI response parsing/validation error
     }
 
+    // Return the parsed data including message, updates, and submission readiness
     return NextResponse.json({
-      message: parsedData.message || "...",
-      updates: parsedData.updates || {}, // Ensure updates is always an object, even if empty
-      isSubmissionReady: parsedData.isSubmissionReady || false,
+      message: parsedData.message || "...", // Fallback message
+      updates: parsedData.updates || {},   // Ensure updates is always an object
+      isSubmissionReady: parsedData.isSubmissionReady || false, // Default to false
     });
 
   } catch (err: any) {
+    // Catch any other errors from the Gemini API or server
     console.error('🔥 Gemini API or Server Error:', err);
     return NextResponse.json(
       {
         error: err.message || 'Internal Server Error',
         message: "Sorry, I'm having trouble connecting to the AI. Please try again in a moment.",
-        updates: {},
+        updates: {}, // Return empty updates on major error
       },
       { status: 500 }
     );
   }
-    }
+}
