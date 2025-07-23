@@ -31,8 +31,8 @@ export default function AgentForm() {
   };
 
   return (
-    <form className="space-y-6 p-8 max-w-lg mx-auto bg-white rounded-3xl shadow-2xl border border-gray-100 font-sans transform transition-all duration-300 hover:shadow-3xl"> {/* Enhanced rounded, shadow, border, and added hover effect */}
-      <h2 className="text-3xl font-extrabold text-gray-800 text-center mb-6 tracking-tight">Build Your AI Agent</h2> {/* Prominent title */}
+    <form className="space-y-6 p-8 max-w-lg mx-auto bg-white rounded-3xl shadow-2xl border border-gray-100 font-sans transform transition-all duration-300 hover:shadow-3xl">
+      <h2 className="text-3xl font-extrabold text-gray-800 text-center mb-6 tracking-tight">Build Your AI Agent</h2>
       
       <div className="relative">
         <input
@@ -42,7 +42,7 @@ export default function AgentForm() {
           onChange={(e) => updateForm({ name: e.target.value })}
           readOnly
           name="name"
-          id="name-field" // Added ID for label
+          id="name-field"
         />
         <label htmlFor="name-field" className="absolute left-4 -top-3.5 text-gray-600 text-sm transition-all peer-placeholder-shown:text-base peer-placeholder-shown:text-gray-400 peer-placeholder-shown:top-4 peer-focus:-top-3.5 peer-focus:text-purple-600 peer-focus:text-sm cursor-text">
           Name
@@ -81,7 +81,7 @@ export default function AgentForm() {
 
       <div className="relative">
         <textarea
-          className="w-full peer border border-gray-200 p-4 rounded-xl text-gray-800 bg-gray-50 placeholder-transparent focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200 resize-y shadow-sm min-h-[120px]" // Adjusted padding, rounded, added shadow-sm, min-height
+          className="w-full peer border border-gray-200 p-4 rounded-xl text-gray-800 bg-gray-50 placeholder-transparent focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200 resize-y shadow-sm min-h-[120px]"
           placeholder="AI Agent Idea"
           rows={5}
           value={formData.idea}
@@ -98,22 +98,22 @@ export default function AgentForm() {
       <button
         id="agent-form-submit-button"
         type="submit"
-        className="w-full bg-gradient-to-r from-purple-600 to-blue-600 text-white px-6 py-3 rounded-xl hover:from-purple-700 hover:to-blue-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 transition duration-300 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed text-xl font-bold shadow-lg transform hover:scale-105" {/* Advanced gradient button */}
+        className="w-full bg-gradient-to-r from-purple-600 to-blue-600 text-white px-6 py-3 rounded-xl hover:from-purple-700 hover:to-blue-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 transition duration-300 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed text-xl font-bold shadow-lg transform hover:scale-105"
         disabled={submissionStatus === 'idle' ? false : true}
       >
         Submit Your Idea
       </button>
 
       {submissionStatus === 'success' && (
-        <div className="mt-6 p-5 bg-green-50 text-green-700 rounded-xl text-center font-semibold shadow-md border border-green-200"> {/* Enhanced success message */}
+        <div className="mt-6 p-5 bg-green-50 text-green-700 rounded-xl text-center font-semibold shadow-md border border-green-200">
           ✨ Thank you, **{formData.name}**! Your AI idea has been submitted successfully! ✨
         </div>
       )}
       {submissionStatus === 'error' && (
-        <div className="mt-6 p-5 bg-red-50 text-red-700 rounded-xl text-center font-semibold shadow-md border border-red-200"> {/* Enhanced error message */}
+        <div className="mt-6 p-5 bg-red-50 text-red-700 rounded-xl text-center font-semibold shadow-md border border-red-200">
           ❌ Failed to submit your idea. Please try again.
         </div>
       )}
     </form>
   );
-        }
+}
