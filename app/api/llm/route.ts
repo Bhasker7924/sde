@@ -1,7 +1,7 @@
 // app/api/llm/route.ts
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { NextRequest, NextResponse } from 'next/server';
-import type { Content } from '@google/generative-ai'; // Import Content type
+import type { Content } from '@google/generative-ai';
 
 // Add the optional 'isSubmissionReady' flag to the response type
 type ParsedLLMResponse = {
@@ -23,7 +23,7 @@ if (!apiKey) {
 }
 
 const genAI = new GoogleGenerativeAI(apiKey);
-const MODEL = 'gemini-2.5-flash-lite-preview-06-17'; // Define model here
+const MODEL = 'gemini-2.5-flash-lite-preview-06-17';
 
 // --- End of Initialization ---
 
@@ -32,7 +32,6 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { messages, formData } = body;
 
-    // ... (Input validation for messages and formData remains the same) ...
     if (!messages || !Array.isArray(messages)) {
       return NextResponse.json({ message: "Invalid messages array.", updates: {} }, { status: 400 });
     }
@@ -40,19 +39,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ message: "Invalid formData object.", updates: {} }, { status: 400 });
     }
 
-    // Ensure conversation history includes the previous assistant responses as 'model'
     const contents: Content[] = messages.map((msg: any) => ({
       role: msg.role === 'user' ? 'user' : 'model',
-      // Ensure parts is an array of objects with a 'text' property
       parts: [{ text: msg.content }],
     }));
 
-    // --- Updated System Prompt with Review and Submit Logic (THE MAIN BRAIN) ---
-    // This system instruction will guide the LLM's behavior comprehensively.
     const systemInstruction: Content = {
-      // Role can be 'user' or 'system' depending on model interpretation.
-      // For models that primarily take turn-based 'user'/'model' content,
-      // providing system instructions as an initial 'user' turn is a common pattern.
       role: 'user',
       parts: [
         {
@@ -94,7 +86,7 @@ ${JSON.stringify(formData)}
        - **AI Idea**: An AI agent for automated unit test generation.
        Does everything look correct? Or would you like to change anything?
        \`\`\`
-     - If the user indicates a desire to edit a specific field (e.g., "my email is wrong", "change name to Alex"), identify the field, include the update in your 'updates' object, and then **return to the Reviewing State** by presenting the *updated summary* again. Do NOT ask for the next field if an edit occurs; always re-present the full review.
+     - If the user indicates a desire to edit a specific field, identify the field, include the update in your 'updates' object, and then **return to the Reviewing State** by presenting the *updated summary* again. Do NOT ask for the next field if an edit occurs; always re-present the full review.
 
 **3. Submitting State:**
    - **Trigger:** You are currently in the 'Reviewing State' AND the user explicitly confirms the details are correct (e.g., "looks good", "yes", "submit it", "confirm").
@@ -105,18 +97,16 @@ ${JSON.stringify(formData)}
 ---
 
 **Output Format:**
-Always return a valid JSON object. Do NOT include any other text, explanations, or markdown outside the JSON block. The 'updates' object should only contain fields that *need* to be changed or added.
+Always return a valid JSON object. Do NOT include any other text, explanations, or markdown outside the JSON block.
 
 \`\`\`json
 {
   "message": "A conversational message to the user.",
   "updates": {
     "name": "Updated Name",
-    "email": "updated@example.com",
-    "linkedin": "https://new.linkedin.com/profile",
-    "idea": "New AI idea text"
+    "email": "updated@example.com"
   },
-  "isSubmissionReady": true // This MUST be true ONLY in the Submitting State.
+  "isSubmissionReady": false
 }
 \`\`\`
 `,
@@ -129,10 +119,10 @@ Always return a valid JSON object. Do NOT include any other text, explanations, 
     });
 
     const result = await model.generateContent({
-      contents: [systemInstruction, ...contents], // Pass system instruction along with conversation history
+      contents: [systemInstruction, ...contents],
       generationConfig: {
         temperature: 0.5,
-        responseMimeType: "application/json", // Crucial for getting JSON output
+        responseMimeType: "application/json",
       },
     });
 
@@ -140,8 +130,13 @@ Always return a valid JSON object. Do NOT include any other text, explanations, 
     let parsedData: ParsedLLMResponse;
 
     try {
-      parsedData = JSON.parse(rawReplyText);
-      // Basic validation for the structure of the parsed response
+      // FIX: Clean the LLM response by removing markdown code block delimiters
+      const cleanedReplyText = rawReplyText
+        .replace(/^```json\s*/, '')
+        .replace(/\s*```$/, '')
+        .trim();
+
+      parsedData = JSON.parse(cleanedReplyText);
       if (typeof parsedData.message !== 'string' || typeof parsedData.updates !== 'object') {
         throw new Error('Invalid structure from LLM JSON response.');
       }
@@ -150,7 +145,7 @@ Always return a valid JSON object. Do NOT include any other text, explanations, 
       return NextResponse.json({
         message: "I'm having a little trouble understanding my own thoughts right now. Could you please rephrase that?",
         updates: {},
-      }, { status: 500 }); // 500 status for internal AI response parsing error
+      }, { status: 500 });
     }
 
     return NextResponse.json({
