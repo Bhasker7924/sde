@@ -60,7 +60,7 @@ ${JSON.stringify(formData)}
 - If any of the four fields are empty in the 'Current Form State', you are in the 'Collecting' state.
 - Your goal is to ask for the *next single missing field* in the sequence.
 - Validate the user's input. If invalid (e.g., bad email), politely ask again for the same field.
-- Once you extract valid information, provide a brief confirmation with all fields you have and ask for the next field.
+- Once you extract valid information, provide a brief confirmation and ask for the next field.
 
 **2. Reviewing State:**
 - **TRIGGER:** You enter this state ONLY when all four fields (name, email, linkedin, idea) are filled.
