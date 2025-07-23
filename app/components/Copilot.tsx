@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useContext, useRef, useEffect } from 'react';
-import { useFormContext, FormData } from './FormContext'; // Ensure FormData is correctly imported and represents your form's structure
+import { useFormContext, FormData } from './FormContext';
 
 type Message = {
   role: 'user' | 'assistant';
@@ -17,19 +17,23 @@ type LLMResponse = {
 };
 
 export default function Copilot() {
+  // --- Add these useState declarations ---
   const [input, setInput] = useState<string>('');
   const [conversation, setConversation] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [isCompleted, setIsCompleted] = useState<boolean>(false);
-  const { formData, updateForm } = useFormContext();
-  const chatEndRef = useRef<HTMLDivElement>(null);
+  // --- End of added states ---
 
-  // useEffect for scrolling to the bottom of the chat
+  const [isCompleted, setIsCompleted] = useState<boolean>(false); // New state to disable chat after submission
+  const { formData, updateForm } = useFormContext();
+  const chatEndRef = useRef<HTMLDivElement>(null); // Ref for scrolling
+
+  // Effect to scroll to the bottom of the chat
   useEffect(() => {
     if (chatEndRef.current) {
       chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
-  }, [conversation]); // Dependency on conversation ensures it scrolls on new messages
+  }, [conversation]);
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -63,19 +67,19 @@ export default function Copilot() {
         { role: 'assistant', content: data.message || '...' },
       ]);
 
+      // --- This is the new logic for auto-submission ---
       if (data.isSubmissionReady) {
-        setIsCompleted(true);
+        setIsCompleted(true); // Disable the chat input
+        // Use a short delay to allow the user to read the final message
         setTimeout(() => {
+            // Find the submit button by its ID and programmatically click it
             const submitButton = document.getElementById('agent-form-submit-button') as HTMLButtonElement | null;
             if (submitButton) {
                 submitButton.click();
-                updateForm({ name: '', email: '', linkedin: '', idea: '' }); // Reset all fields
-                setConversation([]); // Clear chat history
-                setIsCompleted(false); // Allow new interaction
             } else {
                 console.error("Could not find the form's submit button.");
             }
-        }, 1500);
+        }, 1500); // 1.5-second delay
       }
 
     } catch (err: any) {
@@ -89,14 +93,14 @@ export default function Copilot() {
     }
   };
 
-  // --- START OF MISSING JSX RETURN STATEMENT ---
+  // The JSX is mostly the same, but we will disable the input form when completed.
   return (
     <div className="flex flex-col h-full bg-gradient-to-br from-blue-50 to-indigo-100 shadow-2xl rounded-2xl border border-blue-200 p-6">
-      <h2 className="text-2xl font-bold text-gray-800 mb-4 text-center">Your AI Project Assistant 🤖</h2>
+      <h2 className="text-2xl font-bold text-gray-800 mb-4 text-center">Your AI Copilot 🤖</h2>
       <div className="flex-grow overflow-y-auto pr-2 mb-4 space-y-4">
         {conversation.length === 0 && (
           <div className="text-center text-gray-500 italic mt-10">
-            Let's start building your AI project README!
+            Start by telling me your name!
           </div>
         )}
         {conversation.map((msg, index) => (
@@ -117,22 +121,22 @@ export default function Copilot() {
             </div>
           </div>
         ))}
-        <div ref={chatEndRef} /> {/* This div is for scrolling */}
+        <div ref={chatEndRef} />
       </div>
 
       <form onSubmit={handleSubmit} className="flex gap-3 p-2 bg-white rounded-lg shadow-inner border border-blue-100 mt-auto">
         <input
           type="text"
           className="flex-grow px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200 text-gray-800"
-          placeholder={isCompleted ? "README submitted!" : isLoading ? "Thinking..." : "Type your message..."}
+          placeholder={isCompleted ? "Thank you!" : isLoading ? "Please wait..." : "Type your message..."}
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          disabled={isLoading || isCompleted}
+          disabled={isLoading || isCompleted} // Disable if loading or if the process is complete
         />
         <button
           type="submit"
           className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-2 rounded-lg shadow-md hover:shadow-lg disabled:opacity-60 disabled:cursor-not-allowed transition-all duration-200 flex items-center justify-center gap-1"
-          disabled={isLoading || isCompleted}
+          disabled={isLoading || isCompleted} // Disable if loading or if the process is complete
         >
           {isLoading ? (
             <svg
@@ -172,5 +176,4 @@ export default function Copilot() {
       </form>
     </div>
   );
-  // --- END OF MISSING JSX RETURN STATEMENT ---
-          }
+}
