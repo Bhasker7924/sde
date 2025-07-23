@@ -92,7 +92,7 @@ Always return a valid JSON object.
       };
     
     const model = genAI.getGenerativeModel({
-      model: 'gemini-2.5-flash-lite',
+      model: 'gemini-2.5-flash-lite-preview-06-17',
     });
 
     const result = await model.generateContent({

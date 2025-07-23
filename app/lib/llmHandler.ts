@@ -7,7 +7,7 @@ if (!process.env.GOOGLE_API_KEY) {
 }
 
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
-const MODEL = 'gemini-2.5-flash-lite';
+const MODEL = 'gemini-2.5-flash-lite-preview-06-17';
 
 // IMPORTANT: Ensure these match the keys in your FormData type in FormContext.tsx
 const FORM_FIELDS = ['name', 'email', 'linkedin', 'idea'] as const;
