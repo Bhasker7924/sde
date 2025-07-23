@@ -5,33 +5,28 @@ import { useFormContext } from './FormContext';
 import { useState } from 'react';
 
 export default function AgentForm() {
-  const { formData, updateForm, resetForm } = useFormContext(); // Destructure resetForm
+  const { formData, updateForm, resetForm } = useFormContext();
   const [submissionStatus, setSubmissionStatus] = useState<'idle' | 'success' | 'error'>('idle');
 
   // Function to handle the actual form submission
   const handleFormSubmit = async (e: React.FormEvent) => {
-    e.preventDefault(); // Prevent default page reload
-    setSubmissionStatus('idle'); // Reset status before new attempt
+    e.preventDefault();
+    setSubmissionStatus('idle');
 
-    console.log('Form Submitted Automatically by Copilot!', formData);
-    // Here you would typically send the data to a server, e.g., using another fetch call.
-    // Simulate an API call
+    console.log('Form Submitted Automatically by Copilot or Manually!', formData);
+
     try {
-      // Replace with your actual API call, e.g.:
-      // const response = await fetch('/api/submit-form', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify(formData),
-      // });
-      // if (!response.ok) {
-      //   throw new Error('Form submission failed.');
-      // }
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate network delay
+      // Simulate an API call for form submission
+      await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate network delay
+
       setSubmissionStatus('success');
-      // --- Call resetForm here after successful submission ---
-      resetForm();
-      // Optionally, reset conversation in Copilot after a short delay for user to read success message
-      // This would require a prop or another context, but for now, this resets the form fields.
+      resetForm(); // Clear the form fields immediately
+
+      // --- NEW: Trigger page refresh after a short delay for user to see success message ---
+      setTimeout(() => {
+        window.location.reload(); // Refreshes the entire page
+      }, 2000); // 2-second delay before refresh
+
     } catch (error) {
       console.error('Form submission error:', error);
       setSubmissionStatus('error');
@@ -77,7 +72,6 @@ export default function AgentForm() {
         id="agent-form-submit-button"
         type="submit"
         className="w-full bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed"
-        // Disable only if submission is in progress, not if already success/error (allows re-submission after error)
         disabled={submissionStatus === 'idle' ? false : true}
       >
         Submit Your Idea
