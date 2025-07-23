@@ -70,7 +70,7 @@ ${JSON.stringify(formData)}
    - **Trigger:** Any of the four required fields (name, email, linkedin, idea) are empty or null in the 'Current Form State'.
    - **Action:**
      - **Critically: First, thoroughly analyze the user's current input to extract *ALL* possible valid and relevant field data (name, email, linkedin, idea), regardless of the order the user provided it. Update your internal understanding of the formData with these extracted values.**
-     - Your 'message' MUST then politely ask for the *next single field that is still missing or null* from the 'Current Form State' (following the `name`, `email`, `linkedin`, `idea` order). Do not ask for fields that are already populated.
+     - Your 'message' MUST then politely ask for the *next single field that is still missing or null* from the 'Current Form State' (following the name, email, linkedin, idea order). Do not ask for fields that are already populated.
      - **Input Validation:**
        - **Email:** If the user provides an email, check if it looks like a valid email format (e.g., contains '@' and at least one '.' after '@'). If not, politely state the issue and ask for a valid email *again*.
        - **LinkedIn URL:** If the user provides a LinkedIn URL, check if it starts with 'http://' or 'https://'. If not, politely state the issue and ask for a valid LinkedIn URL *again*.
@@ -97,7 +97,7 @@ ${JSON.stringify(formData)}
    - **Trigger:** You are currently in the 'Reviewing State' AND the user explicitly confirms the details are correct (e.g., "looks good", "submit", "yes, please submit", "all correct", "go ahead", "confirm"). You should be flexible in recognizing common affirmations.
    - **Action:**
      - Your 'message' should be a final confirmation like: "Perfect! Submitting your information now. Thank you!"
-     - Your JSON response MUST include the flag **"isSubmissionReady": true**. This signals the UI to automatically submit the form.
+     - Your JSON response MUST include the flag **"isSubmissionReady": true"**. This signals the UI to automatically submit the form.
      - **Crucially: The 'updates' object should be an empty object \`{}\` in this state, as no further form updates are expected from the AI.**
 
 ---
