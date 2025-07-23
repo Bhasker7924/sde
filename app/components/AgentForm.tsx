@@ -15,14 +15,16 @@ export default function AgentForm() {
     console.log('Form Submitted Automatically by Copilot or Manually!', formData);
 
     try {
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // Simulate an API call for form submission
+      await new Promise(resolve => setTimeout(resolve, 500)); // Shorten initial delay for quicker success display
 
       setSubmissionStatus('success');
-      resetForm();
+      resetForm(); // Clear the form fields immediately
 
+      // --- MODIFIED: Show success message for 2 seconds, then reload ---
       setTimeout(() => {
-        window.location.reload();
-      }, 2000);
+        window.location.reload(); // Refreshes the entire page
+      }, 2000); // 2-second delay for the user to see the success message
 
     } catch (error) {
       console.error('Form submission error:', error);
