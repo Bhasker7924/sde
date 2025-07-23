@@ -1,7 +1,7 @@
 // app/components/Copilot.tsx
 'use client';
 
-import { useState, useContext, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useFormContext, FormData } from './FormContext';
 
 type Message = {
@@ -9,7 +9,6 @@ type Message = {
   content: string;
 };
 
-// Update the response type to include the new flag
 type LLMResponse = {
   message: string;
   updates: Partial<FormData>;
@@ -17,23 +16,23 @@ type LLMResponse = {
 };
 
 export default function Copilot() {
-  // --- Add these useState declarations ---
   const [input, setInput] = useState<string>('');
   const [conversation, setConversation] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
-  // --- End of added states ---
-
-  const [isCompleted, setIsCompleted] = useState<boolean>(false); // New state to disable chat after submission
+  const [isCompleted, setIsCompleted] = useState<boolean>(false);
   const { formData, updateForm } = useFormContext();
-  const chatEndRef = useRef<HTMLDivElement>(null); // Ref for scrolling
+  const chatEndRef = useRef<HTMLDivElement>(null);
 
-  // Effect to scroll to the bottom of the chat
   useEffect(() => {
     if (chatEndRef.current) {
       chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
-  }, [conversation]);
-
+    // Initial message from copilot if conversation is empty
+    // Only set if not currently loading (to avoid double message on initial render)
+    if (conversation.length === 0 && !isLoading) {
+      setConversation([{ role: 'assistant', content: "Hello! I'm your AI Copilot for this form. Let's start with your **name**." }]);
+    }
+  }, [conversation, isLoading]); // Depend on conversation and isLoading
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -61,13 +60,12 @@ export default function Copilot() {
       if (data.updates && Object.keys(data.updates).length > 0) {
         updateForm(data.updates);
       }
-      
+
       setConversation((prev) => [
         ...prev,
         { role: 'assistant', content: data.message || '...' },
       ]);
 
-      // --- This is the new logic for auto-submission ---
       if (data.isSubmissionReady) {
         setIsCompleted(true); // Disable the chat input
         // Use a short delay to allow the user to read the final message
@@ -86,23 +84,17 @@ export default function Copilot() {
       console.error('Error in handleSubmit:', err);
       setConversation((prev) => [
         ...prev,
-        { role: 'assistant', content: `⚠️ ${err.message || 'Failed to get a response.'}` },
+        { role: 'assistant', content: `Oops! It looks like there was an issue. Could you please try that again?` },
       ]);
     } finally {
       setIsLoading(false);
     }
   };
 
-  // The JSX is mostly the same, but we will disable the input form when completed.
   return (
     <div className="flex flex-col h-full bg-gradient-to-br from-blue-50 to-indigo-100 shadow-2xl rounded-2xl border border-blue-200 p-6">
       <h2 className="text-2xl font-bold text-gray-800 mb-4 text-center">Your AI Copilot 🤖</h2>
-      <div className="flex-grow overflow-y-auto pr-2 mb-4 space-y-4">
-        {conversation.length === 0 && (
-          <div className="text-center text-gray-500 italic mt-10">
-            Start by telling me your name!
-          </div>
-        )}
+      <div className="flex-grow overflow-y-auto pr-2 mb-4 space-y-4 custom-scrollbar">
         {conversation.map((msg, index) => (
           <div
             key={index}
@@ -128,7 +120,7 @@ export default function Copilot() {
         <input
           type="text"
           className="flex-grow px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200 text-gray-800"
-          placeholder={isCompleted ? "Thank you!" : isLoading ? "Please wait..." : "Type your message..."}
+          placeholder={isCompleted ? "Form submitted! Thank you!" : isLoading ? "Copilot is typing..." : "Type your message..."}
           value={input}
           onChange={(e) => setInput(e.target.value)}
           disabled={isLoading || isCompleted} // Disable if loading or if the process is complete
@@ -174,6 +166,23 @@ export default function Copilot() {
           )}
         </button>
       </form>
+      {/* Optional: Add a subtle scrollbar style */}
+      <style jsx>{`
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 8px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: #f1f1f1;
+          border-radius: 10px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: #888;
+          border-radius: 10px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: #555;
+        }
+      `}</style>
     </div>
   );
-}
+        }
