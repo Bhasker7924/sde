@@ -36,7 +36,7 @@ export const FormProvider = ({ children }: { children: ReactNode }) => {
     setFormData((prev) => ({ ...prev, ...updates }));
   };
 
-  const resetForm = () => { // New function to reset form data
+  const resetForm = () => { 
     setFormData(defaultForm);
   };
 

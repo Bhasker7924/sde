@@ -15,9 +15,9 @@ type LLMResponse = {
   isSubmissionReady?: boolean;
 };
 
-// Function to clean markdown bolding (**) from text
+
 const cleanMarkdownBold = (text: string): string => {
-  return text.replace(/\*\*(.*?)\*\*/g, '$1'); // Removes ** surrounding text
+  return text.replace(/\*\*(.*?)\*\*/g, '$1'); 
 };
 
 export default function Copilot() {

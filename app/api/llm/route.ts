@@ -3,7 +3,6 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { NextRequest, NextResponse } from 'next/server';
 import type { Content } from '@google/generative-ai';
 
-// Add the optional 'isSubmissionReady' flag to the response type
 type ParsedLLMResponse = {
   message: string;
   updates: {
@@ -12,7 +11,7 @@ type ParsedLLMResponse = {
     linkedin?: string;
     idea?: string;
   };
-  isSubmissionReady?: boolean; // New flag to signal form submission
+  isSubmissionReady?: boolean; 
 };
 
 // --- API Key Check and genAI Initialization ---
@@ -32,7 +31,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { messages, formData } = body;
 
-    // Basic input validation
+   
     if (!messages || !Array.isArray(messages)) {
       return NextResponse.json({ message: "Invalid messages array.", updates: {} }, { status: 400 });
     }
@@ -42,7 +41,7 @@ export async function POST(req: NextRequest) {
 
     // Map incoming messages to the Content type required by GoogleGenerativeAI
     const contents: Content[] = messages.map((msg: any) => ({
-      role: msg.role === 'user' ? 'user' : 'model', // Ensure roles are 'user' or 'model'
+      role: msg.role === 'user' ? 'user' : 'model', 
       parts: [{ text: msg.content }],
     }));
 

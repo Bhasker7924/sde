@@ -8,9 +8,8 @@ export default function AgentForm() {
   const { formData, updateForm, resetForm } = useFormContext();
   const [submissionStatus, setSubmissionStatus] = useState<'idle' | 'success' | 'error'>('idle');
 
-  // --- NEW: Function to check if all required fields are filled ---
   const areAllFieldsFilled = () => {
-    // Check if all string fields are non-empty after trimming whitespace
+
     return (
       formData.name &&
       formData.email &&
@@ -23,7 +22,7 @@ export default function AgentForm() {
     e.preventDefault();
     setSubmissionStatus('idle'); // Reset status before a new submission attempt
 
-    // Optional: Add a client-side check here as well, though the button will be disabled
+ 
     if (!areAllFieldsFilled()) {
         console.warn("Attempted submission with incomplete fields.");
         return; // Prevent submission if fields are not filled
