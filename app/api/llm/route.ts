@@ -76,14 +76,14 @@ ${JSON.stringify(formData)}
 **2. Reviewing State:**
    - **Trigger:** ALL four fields (name, email, linkedin, idea) are filled in the 'Current Form State'.
    - **Action:**
-     - Your 'message' MUST present a clear, bulleted summary of *all* the collected data. Use markdown for formatting.
+     - Your 'message' MUST present a clear, bulleted summary of *all* the collected data. Use markdown for formatting. **Crucially, do NOT use bold (**) for the field names in the summary to avoid rendering issues if the frontend doesn't expect it.**
      - **Example:**
        \`\`\`
        Great, I have all your details! Please take a moment to review them:
-       - **Name**: John Doe
-       - **Email**: john.doe@example.com
-       - **LinkedIn**: https://linkedin.com/in/john-doe
-       - **AI Idea**: An AI agent for automated unit test generation.
+       - Name: John Doe
+       - Email: john.doe@example.com
+       - LinkedIn: https://linkedin.com/in/john-doe
+       - AI Idea: An AI agent for automated unit test generation.
        Does everything look correct? Or would you like to change anything?
        \`\`\`
      - If the user indicates a desire to edit a specific field, identify the field, include the update in your 'updates' object, and then **return to the Reviewing State** by presenting the *updated summary* again. Do NOT ask for the next field if an edit occurs; always re-present the full review.
@@ -130,16 +130,28 @@ Always return a valid JSON object. Do NOT include any other text, explanations, 
     let parsedData: ParsedLLMResponse;
 
     try {
-      // FIX: Clean the LLM response by removing markdown code block delimiters
+      // FIX 1: Clean the LLM response by removing markdown code block delimiters
       const cleanedReplyText = rawReplyText
         .replace(/^```json\s*/, '')
         .replace(/\s*```$/, '')
         .trim();
 
       parsedData = JSON.parse(cleanedReplyText);
-      if (typeof parsedData.message !== 'string' || typeof parsedData.updates !== 'object') {
-        throw new Error('Invalid structure from LLM JSON response.');
+
+      // FIX 2: Validate structure, allowing 'updates' to be optional when submitting
+      if (typeof parsedData.message !== 'string') {
+        throw new Error('LLM response missing "message" string.');
       }
+
+      // If not in submission state, 'updates' must be an object
+      if (!parsedData.isSubmissionReady && typeof parsedData.updates !== 'object') {
+          throw new Error('LLM response missing "updates" object when not submitting.');
+      }
+
+      // Ensure 'updates' is at least an empty object if it's not present
+      // This makes the rest of your frontend code (e.g., updateForm) work consistently.
+      parsedData.updates = parsedData.updates || {};
+
     } catch (parseError) {
       console.error('❌ Failed to parse JSON from Gemini or invalid structure:', rawReplyText, parseError);
       return NextResponse.json({
