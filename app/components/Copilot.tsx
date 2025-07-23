@@ -32,10 +32,8 @@ export default function Copilot() {
     if (chatEndRef.current) {
       chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
-    // Initial message from copilot if conversation is empty
     if (conversation.length === 0 && !isLoading) {
-      // Updated initial message: removed ** from 'name'
-      setConversation([{ role: 'assistant', content: "Hello! I'm your AI Copilot for this form. Let's start with your name." }]);
+      setConversation([{ role: 'assistant', content: "👋 Hello! I'm your AI Copilot for this form. Let's start with your name." }]); // Added emoji
     }
   }, [conversation, isLoading]);
 
@@ -66,7 +64,6 @@ export default function Copilot() {
         updateForm(data.updates);
       }
 
-      // --- NEW: Clean markdown bolding from AI's message before displaying ---
       const cleanedAIMessage = cleanMarkdownBold(data.message || '...');
 
       setConversation((prev) => [
@@ -90,7 +87,7 @@ export default function Copilot() {
       console.error('Error in handleSubmit:', err);
       setConversation((prev) => [
         ...prev,
-        { role: 'assistant', content: `Oops! It looks like there was an issue. Could you please try that again?` },
+        { role: 'assistant', content: `Oops! 😟 It looks like there was an issue. Could you please try that again?` }, // Added emoji
       ]);
     } finally {
       setIsLoading(false);
@@ -98,9 +95,9 @@ export default function Copilot() {
   };
 
   return (
-    <div className="flex flex-col h-full bg-gradient-to-br from-blue-50 to-indigo-100 shadow-2xl rounded-2xl border border-blue-200 p-6 font-sans"> {/* Added font-sans */}
-      <h2 className="text-2xl font-extrabold text-gray-800 mb-6 text-center tracking-tight">Your AI Copilot 🤖</h2> {/* Increased font weight, margin, and tracking */}
-      <div className="flex-grow overflow-y-auto pr-2 mb-4 space-y-4 custom-scrollbar">
+    <div className="flex flex-col h-full bg-gradient-to-br from-purple-50 to-indigo-100 shadow-3xl rounded-3xl border border-purple-200 p-6 font-sans"> {/* Enhanced gradient, shadow, rounded, border */}
+      <h2 className="text-3xl font-extrabold text-gray-800 mb-6 text-center tracking-tight">Your AI Copilot 🤖</h2> {/* Increased font size, weight, tracking */}
+      <div className="flex-grow overflow-y-auto pr-3 mb-6 space-y-5 custom-scrollbar"> {/* Increased spacing and padding */}
         {conversation.map((msg, index) => (
           <div
             key={index}
@@ -109,10 +106,10 @@ export default function Copilot() {
             }`}
           >
             <div
-              className={`max-w-[70%] px-4 py-3 rounded-xl shadow-md text-base ${ // Adjusted padding and shadow
+              className={`max-w-[75%] px-5 py-3 rounded-2xl text-lg shadow-lg ${ // Adjusted max-width, padding, rounded, shadow, font size
                 msg.role === 'user'
-                  ? 'bg-blue-600 text-white rounded-br-none' // Darker blue for user
-                  : 'bg-white text-gray-800 rounded-bl-none border border-gray-200'
+                  ? 'bg-gradient-to-br from-purple-500 to-blue-500 text-white rounded-br-none' // Gradient for user messages
+                  : 'bg-white text-gray-800 rounded-bl-none border border-gray-100' // Lighter border for assistant
               }`}
             >
               {msg.content}
@@ -122,23 +119,23 @@ export default function Copilot() {
         <div ref={chatEndRef} />
       </div>
 
-      <form onSubmit={handleSubmit} className="flex gap-3 p-3 bg-white rounded-xl shadow-lg border border-blue-100 mt-auto"> {/* Adjusted padding, shadow, border, rounded */}
+      <form onSubmit={handleSubmit} className="flex gap-4 p-4 bg-white rounded-2xl shadow-xl border border-purple-100 mt-auto"> {/* Adjusted gap, padding, rounded, shadow, border */}
         <input
           type="text"
-          className="flex-grow px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200 text-gray-800 placeholder:text-gray-500" // Added placeholder styling
-          placeholder={isCompleted ? "Form submitted! Thank you!" : isLoading ? "Copilot is typing..." : "Type your message..."}
+          className="flex-grow px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all duration-200 text-lg text-gray-800 placeholder:text-gray-500" // Adjusted padding, rounded, focus ring, font size
+          placeholder={isCompleted ? "Form submitted! Thank you!" : isLoading ? "Copilot is thinking..." : "Type your message..."} // Improved placeholder text
           value={input}
           onChange={(e) => setInput(e.target.value)}
           disabled={isLoading || isCompleted}
         />
         <button
           type="submit"
-          className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-2 rounded-lg shadow-md hover:shadow-lg disabled:opacity-60 disabled:cursor-not-allowed transition-all duration-200 flex items-center justify-center gap-1"
+          className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-bold px-7 py-3 rounded-xl shadow-lg hover:shadow-xl disabled:opacity-60 disabled:cursor-not-allowed transition-all duration-200 flex items-center justify-center gap-2 text-lg" // Advanced gradient button
           disabled={isLoading || isCompleted}
         >
           {isLoading ? (
             <svg
-              className="animate-spin h-5 w-5 text-white"
+              className="animate-spin h-6 w-6 text-white" // Larger spinner
               xmlns="http://www.w3.org/2000/svg"
               fill="none"
               viewBox="0 0 24 24"
@@ -177,15 +174,15 @@ export default function Copilot() {
           width: 8px;
         }
         .custom-scrollbar::-webkit-scrollbar-track {
-          background: #f0f4f8; /* Lighter track */
+          background: #f8fafc; /* Lighter track matching theme */
           border-radius: 10px;
         }
         .custom-scrollbar::-webkit-scrollbar-thumb {
-          background: #aab8c2; /* Medium gray thumb */
+          background: #d4a7f0; /* Purple-ish thumb matching theme */
           border-radius: 10px;
         }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-          background: #8898a8; /* Darker on hover */
+          background: #b07cd2; /* Darker on hover */
         }
       `}</style>
     </div>
