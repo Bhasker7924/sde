@@ -10,21 +10,22 @@ export default function AgentForm() {
 
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSubmissionStatus('idle');
+    setSubmissionStatus('idle'); // Reset status before new submission attempt
 
     console.log('Form Submitted Automatically by Copilot or Manually!', formData);
 
     try {
       // Simulate an API call for form submission
-      await new Promise(resolve => setTimeout(resolve, 500)); // Shorten initial delay for quicker success display
+      await new Promise(resolve => setTimeout(resolve, 500)); // Simulate network delay
 
-      setSubmissionStatus('success'); // Display the success message immediately
+      setSubmissionStatus('success'); // <-- THIS SETS THE STATUS TO 'success' AND DISPLAYS THE MESSAGE
 
-      // --- MODIFIED: Show success message for 2 seconds, then reset and reload ---
+      // This timeout will ensure the 'success' message stays for 2 seconds
+      // before the form is reset and the page reloads.
       setTimeout(() => {
-        resetForm(); // Clear the form fields AFTER the message has been visible
-        window.location.reload(); // Refreshes the entire page
-      }, 2000); // 2-second delay for the user to see the success message
+        resetForm(); // Reset form data (which likely changes submissionStatus to 'idle')
+        window.location.reload(); // Reload the page
+      }, 2000); // Wait 2 seconds
 
     } catch (error) {
       console.error('Form submission error:', error);
