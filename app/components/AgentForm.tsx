@@ -8,7 +8,6 @@ export default function AgentForm() {
   const { formData, updateForm, resetForm } = useFormContext();
   const [submissionStatus, setSubmissionStatus] = useState<'idle' | 'success' | 'error'>('idle');
 
-  // Function to handle the actual form submission
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmissionStatus('idle');
@@ -16,16 +15,14 @@ export default function AgentForm() {
     console.log('Form Submitted Automatically by Copilot or Manually!', formData);
 
     try {
-      // Simulate an API call for form submission
-      await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate network delay
+      await new Promise(resolve => setTimeout(resolve, 1500));
 
       setSubmissionStatus('success');
-      resetForm(); // Clear the form fields immediately
+      resetForm();
 
-      // --- NEW: Trigger page refresh after a short delay for user to see success message ---
       setTimeout(() => {
-        window.location.reload(); // Refreshes the entire page
-      }, 2000); // 2-second delay before refresh
+        window.location.reload();
+      }, 2000);
 
     } catch (error) {
       console.error('Form submission error:', error);
@@ -34,9 +31,9 @@ export default function AgentForm() {
   };
 
   return (
-    <form className="space-y-4 p-4 max-w-xl mx-auto bg-white rounded-lg shadow-md" onSubmit={handleFormSubmit}>
+    <form className="space-y-5 p-6 max-w-xl mx-auto bg-white rounded-xl shadow-xl border border-gray-100 font-sans"> {/* Increased padding, shadow, rounded, and added font-sans */}
       <input
-        className="w-full border border-gray-300 p-2 rounded-md text-gray-800 bg-gray-50 focus:outline-none focus:border-blue-500"
+        className="w-full border border-gray-300 p-3 rounded-lg text-gray-800 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200 shadow-sm" // Adjusted padding, rounded, added shadow-sm
         placeholder="Name"
         value={formData.name}
         onChange={(e) => updateForm({ name: e.target.value })}
@@ -44,7 +41,7 @@ export default function AgentForm() {
         name="name"
       />
       <input
-        className="w-full border border-gray-300 p-2 rounded-md text-gray-800 bg-gray-50 focus:outline-none focus:border-blue-500"
+        className="w-full border border-gray-300 p-3 rounded-lg text-gray-800 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200 shadow-sm"
         placeholder="Email"
         value={formData.email}
         onChange={(e) => updateForm({ email: e.target.value })}
@@ -52,7 +49,7 @@ export default function AgentForm() {
         name="email"
       />
       <input
-        className="w-full border border-gray-300 p-2 rounded-md text-gray-800 bg-gray-50 focus:outline-none focus:border-blue-500"
+        className="w-full border border-gray-300 p-3 rounded-lg text-gray-800 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200 shadow-sm"
         placeholder="LinkedIn URL"
         value={formData.linkedin}
         onChange={(e) => updateForm({ linkedin: e.target.value })}
@@ -60,7 +57,7 @@ export default function AgentForm() {
         name="linkedin"
       />
       <textarea
-        className="w-full border border-gray-300 p-2 rounded-md text-gray-800 bg-gray-50 focus:outline-none focus:border-blue-500 resize-y"
+        className="w-full border border-gray-300 p-3 rounded-lg text-gray-800 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200 resize-y shadow-sm" // Adjusted padding, rounded, added shadow-sm
         placeholder="AI Agent Idea"
         rows={5}
         value={formData.idea}
@@ -71,19 +68,19 @@ export default function AgentForm() {
       <button
         id="agent-form-submit-button"
         type="submit"
-        className="w-full bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed"
+        className="w-full bg-blue-600 text-white px-5 py-3 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition duration-200 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed text-lg font-semibold shadow-md hover:shadow-lg" // Adjusted padding, rounded, focus ring, font size/weight
         disabled={submissionStatus === 'idle' ? false : true}
       >
         Submit Your Idea
       </button>
 
       {submissionStatus === 'success' && (
-        <div className="mt-4 p-3 bg-green-100 text-green-800 rounded-md text-center">
+        <div className="mt-4 p-4 bg-green-100 text-green-800 rounded-lg text-center font-medium shadow-sm"> {/* Adjusted padding, rounded, added font-medium, shadow-sm */}
           Thank you, **{formData.name}**! Your AI idea has been submitted successfully.
         </div>
       )}
       {submissionStatus === 'error' && (
-        <div className="mt-4 p-3 bg-red-100 text-red-800 rounded-md text-center">
+        <div className="mt-4 p-4 bg-red-100 text-red-800 rounded-lg text-center font-medium shadow-sm"> {/* Adjusted padding, rounded, added font-medium, shadow-sm */}
           Failed to submit your idea. Please try again.
         </div>
       )}
