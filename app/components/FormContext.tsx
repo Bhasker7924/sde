@@ -20,9 +20,11 @@ const defaultForm: FormData = {
 export const FormContext = createContext<{
   formData: FormData;
   updateForm: (updates: Partial<FormData>) => void;
+  resetForm: () => void; // Added resetForm to context
 }>({
   formData: defaultForm,
   updateForm: () => {},
+  resetForm: () => {}, // Provide a default no-op function
 });
 
 export const useFormContext = () => useContext(FormContext);
@@ -34,8 +36,12 @@ export const FormProvider = ({ children }: { children: ReactNode }) => {
     setFormData((prev) => ({ ...prev, ...updates }));
   };
 
+  const resetForm = () => { // New function to reset form data
+    setFormData(defaultForm);
+  };
+
   return (
-    <FormContext.Provider value={{ formData, updateForm }}>
+    <FormContext.Provider value={{ formData, updateForm, resetForm }}>
       {children}
     </FormContext.Provider>
   );
