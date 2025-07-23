@@ -1,104 +1,57 @@
 // app/components/AgentForm.tsx
-'use client'; // Essential for client-side functionality and hooks
+'use client';
 
 import { useFormContext } from './FormContext';
-import React from 'react'; // Explicitly import React if not implicitly handled by your Next.js config
 
-// This component uses a default export, which is common for single-component files.
 export default function AgentForm() {
   const { formData, updateForm } = useFormContext();
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    updateForm({ [name]: value });
-  };
-
-  // Check if all fields are complete for enabling the submit button
-  const isFormComplete = formData.name && formData.email && formData.email.includes('@') && formData.linkedin && formData.idea;
-
-  // Handles form submission (useful if the user clicks the button directly)
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (isFormComplete) {
-        console.log("Agent Form submitted manually:", formData);
-        // In a real application, you'd send formData to your backend here.
-        // For this demo, the Copilot also triggers this button.
-    } else {
-        console.log("Form is incomplete. Cannot submit.");
-    }
+  // Function to handle the actual form submission
+  const handleFormSubmit = (e: React.FormEvent) => {
+    e.preventDefault(); // Prevent default page reload
+    console.log('Form Submitted Automatically by Copilot!', formData);
+    // Here you would typically send the data to a server, e.g., using another fetch call.
+    alert(`Thank you, ${formData.name}! Your AI idea has been submitted.`);
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      <div>
-        <label htmlFor="name" className="block text-sm font-medium text-gray-700">
-          Your Name
-        </label>
-        <input
-          type="text"
-          id="name"
-          name="name"
-          value={formData.name}
-          onChange={handleChange}
-          className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-          placeholder="e.g., John Doe"
-        />
-      </div>
-
-      <div>
-        <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-          Contact Email
-        </label>
-        <input
-          type="email"
-          id="email"
-          name="email"
-          value={formData.email}
-          onChange={handleChange}
-          className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-          placeholder="e.g., john.doe@example.com"
-        />
-      </div>
-
-      <div>
-        <label htmlFor="linkedin" className="block text-sm font-medium text-gray-700">
-          LinkedIn Profile URL
-        </label>
-        <input
-          type="url"
-          id="linkedin"
-          name="linkedin"
-          value={formData.linkedin}
-          onChange={handleChange}
-          className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-          placeholder="e.g., https://linkedin.com/in/yourprofile"
-        />
-      </div>
-
-      <div>
-        <label htmlFor="idea" className="block text-sm font-medium text-gray-700">
-          AI Agent Idea Description
-        </label>
-        <textarea
-          id="idea"
-          name="idea"
-          value={formData.idea}
-          onChange={handleChange}
-          rows={5}
-          className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-          placeholder="Describe your AI agent's purpose, key features, and what problem it solves..."
-        ></textarea>
-      </div>
-
-      <button
-        type="submit"
-        id="agent-form-submit-button" // ID for Copilot to click programmatically
-        className={`w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-lg font-semibold text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-all duration-200 ${
-          !isFormComplete ? 'opacity-50 cursor-not-allowed' : '' // Disable if form is not complete
-        }`}
-        disabled={!isFormComplete}
+    // Add the onSubmit handler to the form tag
+    <form className="space-y-4 p-4 max-w-xl mx-auto" onSubmit={handleFormSubmit}>
+      <input
+        className="w-full border p-2 rounded text-gray-800 bg-white"
+        placeholder="Name"
+        value={formData.name}
+        onChange={(e) => updateForm({name: e.target.value})}
+        readOnly // It's good practice to make fields readOnly when a copilot is filling them
+      />
+      <input
+        className="w-full border p-2 rounded text-gray-800 bg-white"
+        placeholder="Email"
+        value={formData.email}
+        onChange={(e) => updateForm({email: e.target.value})}
+        readOnly
+      />
+      <input
+        className="w-full border p-2 rounded text-gray-800 bg-white"
+        placeholder="LinkedIn URL"
+        value={formData.linkedin}
+        onChange={(e) => updateForm({linkedin: e.target.value})}
+        readOnly
+      />
+      <textarea
+        className="w-full border p-2 rounded text-gray-800 bg-white"
+        placeholder="AI Agent Idea"
+        rows={5}
+        value={formData.idea}
+        onChange={(e) => updateForm({idea: e.target.value})}
+        readOnly
+      />
+      <button 
+        id="agent-form-submit-button" // Add an ID for the copilot to find
+        type="submit" 
+        className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
       >
-        Submit AI Agent Idea
+        Submit
       </button>
     </form>
   );

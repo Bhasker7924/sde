@@ -1,7 +1,7 @@
 // app/components/Copilot.tsx
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useContext, useRef, useEffect } from 'react';
 import { useFormContext, FormData } from './FormContext';
 
 type Message = {
@@ -9,41 +9,46 @@ type Message = {
   content: string;
 };
 
+// Update the response type to include the new flag
 type LLMResponse = {
   message: string;
   updates: Partial<FormData>;
-  isSubmissionReady?: boolean; // Flag for when the form is ready to be submitted
+  isSubmissionReady?: boolean;
 };
 
 export default function Copilot() {
+  // --- Add these useState declarations ---
   const [input, setInput] = useState<string>('');
   const [conversation, setConversation] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [isCompleted, setIsCompleted] = useState<boolean>(false); // Tracks if the submission process is complete
-  const { formData, updateForm } = useFormContext();
-  const chatEndRef = useRef<HTMLDivElement>(null);
+  // --- End of added states ---
 
-  // Effect to scroll to the latest message whenever conversation updates
+  const [isCompleted, setIsCompleted] = useState<boolean>(false); // New state to disable chat after submission
+  const { formData, updateForm } = useFormContext();
+  const chatEndRef = useRef<HTMLDivElement>(null); // Ref for scrolling
+
+  // Effect to scroll to the bottom of the chat
   useEffect(() => {
     if (chatEndRef.current) {
       chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [conversation]);
 
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!input.trim() || isLoading || isCompleted) return; // Prevent empty messages, double-sends, or sending after completion
+    if (!input.trim() || isLoading || isCompleted) return;
 
     const userMessage: Message = { role: 'user', content: input };
-    setConversation((prev) => [...prev, userMessage]); // Add user message to conversation
-    setInput(''); // Clear input field
-    setIsLoading(true); // Show loading indicator
+    setConversation((prev) => [...prev, userMessage]);
+    setInput('');
+    setIsLoading(true);
 
     try {
       const res = await fetch('/api/llm', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: [...conversation, userMessage], formData: formData }), // Send full conversation and current form data
+        body: JSON.stringify({ messages: [...conversation, userMessage], formData: formData }),
       });
 
       if (!res.ok) {
@@ -53,55 +58,51 @@ export default function Copilot() {
 
       const data: LLMResponse = await res.json();
 
-      // Update the frontend form with data from the AI
       if (data.updates && Object.keys(data.updates).length > 0) {
         updateForm(data.updates);
       }
       
-      // Add AI's response to conversation
       setConversation((prev) => [
         ...prev,
         { role: 'assistant', content: data.message || '...' },
       ]);
 
-      // If AI indicates submission readiness, trigger the form submit button
+      // --- This is the new logic for auto-submission ---
       if (data.isSubmissionReady) {
-        setIsCompleted(true); // Mark conversation as complete
+        setIsCompleted(true); // Disable the chat input
+        // Use a short delay to allow the user to read the final message
         setTimeout(() => {
+            // Find the submit button by its ID and programmatically click it
             const submitButton = document.getElementById('agent-form-submit-button') as HTMLButtonElement | null;
             if (submitButton) {
-                submitButton.click(); // Programmatically click the form's submit button
-                updateForm({ name: '', email: '', linkedin: '', idea: '' }); // Clear all form fields
-                setConversation([]); // Clear chat history
-                setIsCompleted(false); // Reset completion state to allow new interactions
+                submitButton.click();
             } else {
-                console.error("Could not find the form's submit button to trigger submission.");
+                console.error("Could not find the form's submit button.");
             }
-        }, 1500); // Small delay for better UX
+        }, 1500); // 1.5-second delay
       }
 
     } catch (err: any) {
       console.error('Error in handleSubmit:', err);
       setConversation((prev) => [
         ...prev,
-        { role: 'assistant', content: `⚠️ ${err.message || 'Failed to get a response from the AI.'}` },
+        { role: 'assistant', content: `⚠️ ${err.message || 'Failed to get a response.'}` },
       ]);
     } finally {
-      setIsLoading(false); // Hide loading indicator
+      setIsLoading(false);
     }
   };
 
+  // The JSX is mostly the same, but we will disable the input form when completed.
   return (
     <div className="flex flex-col h-full bg-gradient-to-br from-blue-50 to-indigo-100 shadow-2xl rounded-2xl border border-blue-200 p-6">
-      <h2 className="text-2xl font-bold text-gray-800 mb-4 text-center">Your AI Agent Assistant 🤖</h2>
+      <h2 className="text-2xl font-bold text-gray-800 mb-4 text-center">Your AI Copilot 🤖</h2>
       <div className="flex-grow overflow-y-auto pr-2 mb-4 space-y-4">
         {conversation.length === 0 && (
-          // Initial prompt when no conversation has started
           <div className="text-center text-gray-500 italic mt-10">
-            Hi! I'm here to help you submit your AI agent idea. Let's start with the basics - what's your name?
+            Start by telling me your name!
           </div>
         )}
-        {/* Map through conversation messages and display them */}
         {conversation.map((msg, index) => (
           <div
             key={index}
@@ -112,33 +113,32 @@ export default function Copilot() {
             <div
               className={`max-w-[70%] px-4 py-2 rounded-xl shadow ${
                 msg.role === 'user'
-                  ? 'bg-blue-500 text-white rounded-br-none' // User messages
-                  : 'bg-white text-gray-800 rounded-bl-none border border-gray-200' // Assistant messages
+                  ? 'bg-blue-500 text-white rounded-br-none'
+                  : 'bg-white text-gray-800 rounded-bl-none border border-gray-200'
               }`}
             >
               {msg.content}
             </div>
           </div>
         ))}
-        <div ref={chatEndRef} /> {/* Div for auto-scrolling to bottom */}
+        <div ref={chatEndRef} />
       </div>
 
       <form onSubmit={handleSubmit} className="flex gap-3 p-2 bg-white rounded-lg shadow-inner border border-blue-100 mt-auto">
         <input
           type="text"
           className="flex-grow px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200 text-gray-800"
-          placeholder={isCompleted ? "Idea submitted! Start new chat..." : isLoading ? "Thinking..." : "Type your message..."}
+          placeholder={isCompleted ? "Thank you!" : isLoading ? "Please wait..." : "Type your message..."}
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          disabled={isLoading || isCompleted} // Disable input while loading or after submission
+          disabled={isLoading || isCompleted} // Disable if loading or if the process is complete
         />
         <button
           type="submit"
           className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-2 rounded-lg shadow-md hover:shadow-lg disabled:opacity-60 disabled:cursor-not-allowed transition-all duration-200 flex items-center justify-center gap-1"
-          disabled={isLoading || isCompleted} // Disable button while loading or after submission
+          disabled={isLoading || isCompleted} // Disable if loading or if the process is complete
         >
           {isLoading ? (
-            // Loading spinner
             <svg
               className="animate-spin h-5 w-5 text-white"
               xmlns="http://www.w3.org/2000/svg"
@@ -160,7 +160,6 @@ export default function Copilot() {
               ></path>
             </svg>
           ) : (
-            // Send icon
             <>
               Send
               <svg
@@ -177,4 +176,4 @@ export default function Copilot() {
       </form>
     </div>
   );
-        }
+}

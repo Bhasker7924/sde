@@ -7,15 +7,18 @@ import { createContext, useContext, useState, ReactNode } from 'react';
 export type FormData = {
   name: string;
   email: string;
-  linkedin: string;
-  idea: string; // Ensure this is 'idea'
+  linkedin: string; // Keep this as 'linkedin' to match AgentForm
+  idea: string;
+  // REMOVE THESE TWO LINES:
+  // aiIdea?: string;
+  // LinkedIn?: string;
 };
 
 const defaultForm: FormData = {
   name: '',
   email: '',
-  linkedin: '',
-  idea: '', // Ensure this is 'idea'
+  linkedin: '', // Keep this as 'linkedin' to match AgentForm
+  idea: '',
 };
 
 export const FormContext = createContext<{
@@ -23,7 +26,7 @@ export const FormContext = createContext<{
   updateForm: (updates: Partial<FormData>) => void;
 }>({
   formData: defaultForm,
-  updateForm: () => {}, // Placeholder function
+  updateForm: () => {},
 });
 
 export const useFormContext = () => useContext(FormContext);
