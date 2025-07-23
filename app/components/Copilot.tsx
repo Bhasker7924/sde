@@ -15,6 +15,11 @@ type LLMResponse = {
   isSubmissionReady?: boolean;
 };
 
+// Function to clean markdown bolding (**) from text
+const cleanMarkdownBold = (text: string): string => {
+  return text.replace(/\*\*(.*?)\*\*/g, '$1'); // Removes ** surrounding text
+};
+
 export default function Copilot() {
   const [input, setInput] = useState<string>('');
   const [conversation, setConversation] = useState<Message[]>([]);
@@ -28,11 +33,11 @@ export default function Copilot() {
       chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
     // Initial message from copilot if conversation is empty
-    // Only set if not currently loading (to avoid double message on initial render)
     if (conversation.length === 0 && !isLoading) {
-      setConversation([{ role: 'assistant', content: "Hello! I'm your AI Copilot for this form. Let's start with your **name**." }]);
+      // Updated initial message: removed ** from 'name'
+      setConversation([{ role: 'assistant', content: "Hello! I'm your AI Copilot for this form. Let's start with your name." }]);
     }
-  }, [conversation, isLoading]); // Depend on conversation and isLoading
+  }, [conversation, isLoading]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -61,23 +66,24 @@ export default function Copilot() {
         updateForm(data.updates);
       }
 
+      // --- NEW: Clean markdown bolding from AI's message before displaying ---
+      const cleanedAIMessage = cleanMarkdownBold(data.message || '...');
+
       setConversation((prev) => [
         ...prev,
-        { role: 'assistant', content: data.message || '...' },
+        { role: 'assistant', content: cleanedAIMessage },
       ]);
 
       if (data.isSubmissionReady) {
-        setIsCompleted(true); // Disable the chat input
-        // Use a short delay to allow the user to read the final message
+        setIsCompleted(true);
         setTimeout(() => {
-            // Find the submit button by its ID and programmatically click it
             const submitButton = document.getElementById('agent-form-submit-button') as HTMLButtonElement | null;
             if (submitButton) {
                 submitButton.click();
             } else {
                 console.error("Could not find the form's submit button.");
             }
-        }, 1500); // 1.5-second delay
+        }, 1500);
       }
 
     } catch (err: any) {
@@ -92,8 +98,8 @@ export default function Copilot() {
   };
 
   return (
-    <div className="flex flex-col h-full bg-gradient-to-br from-blue-50 to-indigo-100 shadow-2xl rounded-2xl border border-blue-200 p-6">
-      <h2 className="text-2xl font-bold text-gray-800 mb-4 text-center">Your AI Copilot 🤖</h2>
+    <div className="flex flex-col h-full bg-gradient-to-br from-blue-50 to-indigo-100 shadow-2xl rounded-2xl border border-blue-200 p-6 font-sans"> {/* Added font-sans */}
+      <h2 className="text-2xl font-extrabold text-gray-800 mb-6 text-center tracking-tight">Your AI Copilot 🤖</h2> {/* Increased font weight, margin, and tracking */}
       <div className="flex-grow overflow-y-auto pr-2 mb-4 space-y-4 custom-scrollbar">
         {conversation.map((msg, index) => (
           <div
@@ -103,9 +109,9 @@ export default function Copilot() {
             }`}
           >
             <div
-              className={`max-w-[70%] px-4 py-2 rounded-xl shadow ${
+              className={`max-w-[70%] px-4 py-3 rounded-xl shadow-md text-base ${ // Adjusted padding and shadow
                 msg.role === 'user'
-                  ? 'bg-blue-500 text-white rounded-br-none'
+                  ? 'bg-blue-600 text-white rounded-br-none' // Darker blue for user
                   : 'bg-white text-gray-800 rounded-bl-none border border-gray-200'
               }`}
             >
@@ -116,19 +122,19 @@ export default function Copilot() {
         <div ref={chatEndRef} />
       </div>
 
-      <form onSubmit={handleSubmit} className="flex gap-3 p-2 bg-white rounded-lg shadow-inner border border-blue-100 mt-auto">
+      <form onSubmit={handleSubmit} className="flex gap-3 p-3 bg-white rounded-xl shadow-lg border border-blue-100 mt-auto"> {/* Adjusted padding, shadow, border, rounded */}
         <input
           type="text"
-          className="flex-grow px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200 text-gray-800"
+          className="flex-grow px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200 text-gray-800 placeholder:text-gray-500" // Added placeholder styling
           placeholder={isCompleted ? "Form submitted! Thank you!" : isLoading ? "Copilot is typing..." : "Type your message..."}
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          disabled={isLoading || isCompleted} // Disable if loading or if the process is complete
+          disabled={isLoading || isCompleted}
         />
         <button
           type="submit"
           className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-2 rounded-lg shadow-md hover:shadow-lg disabled:opacity-60 disabled:cursor-not-allowed transition-all duration-200 flex items-center justify-center gap-1"
-          disabled={isLoading || isCompleted} // Disable if loading or if the process is complete
+          disabled={isLoading || isCompleted}
         >
           {isLoading ? (
             <svg
@@ -166,23 +172,22 @@ export default function Copilot() {
           )}
         </button>
       </form>
-      {/* Optional: Add a subtle scrollbar style */}
       <style jsx>{`
         .custom-scrollbar::-webkit-scrollbar {
           width: 8px;
         }
         .custom-scrollbar::-webkit-scrollbar-track {
-          background: #f1f1f1;
+          background: #f0f4f8; /* Lighter track */
           border-radius: 10px;
         }
         .custom-scrollbar::-webkit-scrollbar-thumb {
-          background: #888;
+          background: #aab8c2; /* Medium gray thumb */
           border-radius: 10px;
         }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-          background: #555;
+          background: #8898a8; /* Darker on hover */
         }
       `}</style>
     </div>
   );
-        }
+}
