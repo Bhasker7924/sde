@@ -71,12 +71,12 @@ ${JSON.stringify(formData)}
        - **Email:** If the user provides an email, check if it looks like a valid email format (e.g., contains '@' and at least one '.' after '@'). If not, politely state the issue and ask for a valid email *again*.
        - **LinkedIn URL:** If the user provides a LinkedIn URL, check if it starts with 'http://' or 'https://'. If not, politely state the issue and ask for a valid LinkedIn URL *again*.
      - Once valid information for the current missing field is extracted, provide a brief, positive confirmation and then immediately ask for the *next missing field* in the sequence.
-     - **Example:** If 'name' is missing, ask for name. If 'name' is provided, confirm and ask for 'email'.
+     - **Crucially: In the 'updates' object, include the *single field* that was just successfully collected/updated, along with its new value.**
 
 **2. Reviewing State:**
    - **Trigger:** ALL four fields (name, email, linkedin, idea) are filled in the 'Current Form State'.
    - **Action:**
-     - Your 'message' MUST present a clear, bulleted summary of *all* the collected data. Use markdown for formatting. **Crucially, do NOT use bold (**) for the field names in the summary to avoid rendering issues if the frontend doesn't expect it.**
+     - Your 'message' MUST present a clear, bulleted summary of *all* the collected data. Do NOT use bold (**) for the field names in the summary to avoid rendering issues if the frontend doesn't expect it.
      - **Example:**
        \`\`\`
        Great, I have all your details! Please take a moment to review them:
@@ -86,13 +86,15 @@ ${JSON.stringify(formData)}
        - AI Idea: An AI agent for automated unit test generation.
        Does everything look correct? Or would you like to change anything?
        \`\`\`
-     - If the user indicates a desire to edit a specific field, identify the field, include the update in your 'updates' object, and then **return to the Reviewing State** by presenting the *updated summary* again. Do NOT ask for the next field if an edit occurs; always re-present the full review.
+     - If the user indicates a desire to edit a specific field, identify the field, include *only* that specific update in your 'updates' object. Then, re-enter the Reviewing State by presenting the *updated summary* again. Do NOT ask for the next field if an edit occurs; always re-present the full review.
+     - **Crucially: The 'updates' object in this state should always contain *all four current formData values* to ensure the frontend form fields are fully synchronized with the AI's understanding.**
 
 **3. Submitting State:**
    - **Trigger:** You are currently in the 'Reviewing State' AND the user explicitly confirms the details are correct (e.g., "looks good", "yes", "submit it", "confirm").
    - **Action:**
      - Your 'message' should be a final confirmation like: "Perfect! Submitting your information now. Thank you!"
      - Your JSON response MUST include the flag **"isSubmissionReady": true**. This signals the UI to automatically submit the form.
+     - **Crucially: The 'updates' object should be an empty object `{}` in this state, as no further form updates are expected from the AI.**
 
 ---
 
@@ -104,7 +106,9 @@ Always return a valid JSON object. Do NOT include any other text, explanations, 
   "message": "A conversational message to the user.",
   "updates": {
     "name": "Updated Name",
-    "email": "updated@example.com"
+    "email": "updated@example.com",
+    "linkedin": "updated_linkedin_url",
+    "idea": "updated_ai_idea"
   },
   "isSubmissionReady": false
 }
@@ -138,19 +142,18 @@ Always return a valid JSON object. Do NOT include any other text, explanations, 
 
       parsedData = JSON.parse(cleanedReplyText);
 
-      // FIX 2: Validate structure, allowing 'updates' to be optional when submitting
+      // FIX 2: Validate structure, allowing 'updates' to be optional only when submitting
       if (typeof parsedData.message !== 'string') {
         throw new Error('LLM response missing "message" string.');
       }
 
       // If not in submission state, 'updates' must be an object
-      if (!parsedData.isSubmissionReady && typeof parsedData.updates !== 'object') {
+      // If in submission state, 'updates' can be optional or empty, but we ensure it's an object.
+      if (parsedData.isSubmissionReady) {
+        parsedData.updates = {}; // Force empty updates object on submission
+      } else if (typeof parsedData.updates !== 'object') {
           throw new Error('LLM response missing "updates" object when not submitting.');
       }
-
-      // Ensure 'updates' is at least an empty object if it's not present
-      // This makes the rest of your frontend code (e.g., updateForm) work consistently.
-      parsedData.updates = parsedData.updates || {};
 
     } catch (parseError) {
       console.error('❌ Failed to parse JSON from Gemini or invalid structure:', rawReplyText, parseError);
@@ -162,7 +165,7 @@ Always return a valid JSON object. Do NOT include any other text, explanations, 
 
     return NextResponse.json({
       message: parsedData.message || "...",
-      updates: parsedData.updates || {},
+      updates: parsedData.updates || {}, // Ensure updates is always an object, even if empty
       isSubmissionReady: parsedData.isSubmissionReady || false,
     });
 
@@ -177,4 +180,4 @@ Always return a valid JSON object. Do NOT include any other text, explanations, 
       { status: 500 }
     );
   }
-}
+    }
