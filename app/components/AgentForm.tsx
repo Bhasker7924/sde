@@ -2,10 +2,10 @@
 'use client';
 
 import { useFormContext } from './FormContext';
-import { useState } from 'react'; // Import useState for notification
+import { useState } from 'react';
 
 export default function AgentForm() {
-  const { formData, updateForm } = useFormContext();
+  const { formData, updateForm, resetForm } = useFormContext(); // Destructure resetForm
   const [submissionStatus, setSubmissionStatus] = useState<'idle' | 'success' | 'error'>('idle');
 
   // Function to handle the actual form submission
@@ -28,8 +28,10 @@ export default function AgentForm() {
       // }
       await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate network delay
       setSubmissionStatus('success');
-      // Optionally, clear the form after successful submission
-      // updateForm({ name: '', email: '', linkedin: '', idea: '' });
+      // --- Call resetForm here after successful submission ---
+      resetForm();
+      // Optionally, reset conversation in Copilot after a short delay for user to read success message
+      // This would require a prop or another context, but for now, this resets the form fields.
     } catch (error) {
       console.error('Form submission error:', error);
       setSubmissionStatus('error');
@@ -44,7 +46,7 @@ export default function AgentForm() {
         value={formData.name}
         onChange={(e) => updateForm({ name: e.target.value })}
         readOnly
-        name="name" // Added name attribute
+        name="name"
       />
       <input
         className="w-full border border-gray-300 p-2 rounded-md text-gray-800 bg-gray-50 focus:outline-none focus:border-blue-500"
@@ -52,7 +54,7 @@ export default function AgentForm() {
         value={formData.email}
         onChange={(e) => updateForm({ email: e.target.value })}
         readOnly
-        name="email" // Added name attribute
+        name="email"
       />
       <input
         className="w-full border border-gray-300 p-2 rounded-md text-gray-800 bg-gray-50 focus:outline-none focus:border-blue-500"
@@ -60,7 +62,7 @@ export default function AgentForm() {
         value={formData.linkedin}
         onChange={(e) => updateForm({ linkedin: e.target.value })}
         readOnly
-        name="linkedin" // Added name attribute
+        name="linkedin"
       />
       <textarea
         className="w-full border border-gray-300 p-2 rounded-md text-gray-800 bg-gray-50 focus:outline-none focus:border-blue-500 resize-y"
@@ -69,13 +71,14 @@ export default function AgentForm() {
         value={formData.idea}
         onChange={(e) => updateForm({ idea: e.target.value })}
         readOnly
-        name="idea" // Added name attribute
+        name="idea"
       />
       <button
         id="agent-form-submit-button"
         type="submit"
         className="w-full bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed"
-        disabled={submissionStatus === 'idle' ? false : true} // Disable while submitting or after status is set
+        // Disable only if submission is in progress, not if already success/error (allows re-submission after error)
+        disabled={submissionStatus === 'idle' ? false : true}
       >
         Submit Your Idea
       </button>
