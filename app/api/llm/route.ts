@@ -93,7 +93,7 @@ ${JSON.stringify(formData)}
      - **Crucially: The 'updates' object in this state should always contain *all four current formData values* to ensure the frontend form fields are fully synchronized with the AI's understanding.**
 
 **3. Submitting State:**
-   - **Trigger:** You are currently in the 'Reviewing State' AND the user explicitly confirms the details are correct (e.g., "looks good", "yes", "submit it", "confirm").
+   - **Trigger:** You are currently in the 'Reviewing State' AND the user explicitly confirms the details are correct (e.g., "looks good", "submit", "yes, please submit", "all correct", "go ahead"). You should be flexible in recognizing common affirmations.
    - **Action:**
      - Your 'message' should be a final confirmation like: "Perfect! Submitting your information now. Thank you!"
      - Your JSON response MUST include the flag **"isSubmissionReady": true**. This signals the UI to automatically submit the form.
