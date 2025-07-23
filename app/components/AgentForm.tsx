@@ -8,9 +8,26 @@ export default function AgentForm() {
   const { formData, updateForm, resetForm } = useFormContext();
   const [submissionStatus, setSubmissionStatus] = useState<'idle' | 'success' | 'error'>('idle');
 
+  // --- NEW: Function to check if all required fields are filled ---
+  const areAllFieldsFilled = () => {
+    // Check if all string fields are non-empty after trimming whitespace
+    return (
+      formData.name &&
+      formData.email &&
+      formData.linkedin &&
+      formData.idea
+    );
+  };
+
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSubmissionStatus('idle'); // Reset status before new submission attempt
+    setSubmissionStatus('idle'); // Reset status before a new submission attempt
+
+    // Optional: Add a client-side check here as well, though the button will be disabled
+    if (!areAllFieldsFilled()) {
+        console.warn("Attempted submission with incomplete fields.");
+        return; // Prevent submission if fields are not filled
+    }
 
     console.log('Form Submitted Automatically by Copilot or Manually!', formData);
 
@@ -18,14 +35,12 @@ export default function AgentForm() {
       // Simulate an API call for form submission
       await new Promise(resolve => setTimeout(resolve, 500)); // Simulate network delay
 
-      setSubmissionStatus('success'); // <-- THIS SETS THE STATUS TO 'success' AND DISPLAYS THE MESSAGE
+      setSubmissionStatus('success'); 
 
-      // This timeout will ensure the 'success' message stays for 2 seconds
-      // before the form is reset and the page reloads.
       setTimeout(() => {
-        resetForm(); // Reset form data (which likely changes submissionStatus to 'idle')
-        window.location.reload(); // Reload the page
-      }, 2000); // Wait 2 seconds
+        resetForm(); 
+        window.location.reload(); 
+      }, 2000); 
 
     } catch (error) {
       console.error('Form submission error:', error);
@@ -102,7 +117,8 @@ export default function AgentForm() {
         id="agent-form-submit-button"
         type="submit"
         className="w-full bg-gradient-to-r from-purple-600 to-blue-600 text-white px-6 py-3 rounded-xl hover:from-purple-700 hover:to-blue-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 transition duration-300 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed text-xl font-bold shadow-lg transform hover:scale-105"
-        disabled={submissionStatus === 'idle' ? false : true}
+        // --- MODIFIED: Disable button if not all fields are filled OR if a submission is in progress ---
+        disabled={!areAllFieldsFilled() || submissionStatus !== 'idle'}
       >
         Submit Your Idea
       </button>
