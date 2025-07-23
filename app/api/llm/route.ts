@@ -2,131 +2,133 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { NextRequest, NextResponse } from 'next/server';
 
-// Define the expected structure of the LLM's parsed JSON response
+// Add the optional 'isSubmissionReady' flag to the response type
 type ParsedLLMResponse = {
   message: string;
   updates: {
     name?: string;
     email?: string;
-    linkedin?: string; // Expect lowercase 'l'
-    aiIdea?: string;   // Expect camelCase 'aiIdea'
+    linkedin?: string;
+    idea?: string;
   };
+  isSubmissionReady?: boolean; // New flag to signal form submission
 };
 
-// --- API Key Check and Initialization ---
-if (!process.env.GOOGLE_API_KEY) {
-  throw new Error('❌ GOOGLE_API_KEY is missing from environment variables. Set it in Vercel settings.');
+// --- API Key Check and genAI Initialization ---
+// Ensure you have your API key set as an environment variable (e.g., GOOGLE_API_KEY)
+const apiKey = process.env.GOOGLE_API_KEY;
+
+if (!apiKey) {
+  throw new Error('Missing GOOGLE_API_KEY environment variable');
 }
 
-console.log(
-  '🚀 API key Status:',
-  process.env.GOOGLE_API_KEY ? 'Key is present and has value' : 'Key is missing or empty'
-);
+const genAI = new GoogleGenerativeAI(apiKey);
+// --- End of Initialization ---
 
-const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY || '');
-
-// --- POST Request Handler ---
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { messages } = body;
+    const { messages, formData } = body;
 
+    // ... (Input validation for messages and formData remains the same) ...
     if (!messages || !Array.isArray(messages)) {
-      return NextResponse.json({ error: 'Missing messages array' }, { status: 400 });
+      return NextResponse.json({ message: "Invalid messages array.", updates: {} }, { status: 400 });
+    }
+    if (!formData || typeof formData !== 'object') {
+      return NextResponse.json({ message: "Invalid formData object.", updates: {} }, { status: 400 });
     }
 
-    // Convert OpenAI-style messages to Gemini-style contents
     const contents = messages.map((msg: any) => ({
       role: msg.role === 'user' ? 'user' : 'model',
       parts: [{ text: msg.content }],
     }));
 
-    // Add the system instruction for the AI, guiding its behavior and output format.
+    // --- Updated System Prompt with Review and Submit Logic ---
     const systemInstruction = {
         role: 'user',
         parts: [
           {
-            text: `You are a smart and friendly AI Copilot helping users fill out a form with these 4 fields:
-- name
-- email
-- linkedin (as 'linkedin')
-- AI idea (as 'aiIdea')
+            text: `You are a friendly AI Copilot guiding a user through a form with four states: Collecting, Reviewing, and Submitting.
+The required fields are, in this exact order: name, email, linkedin, idea.
 
-**Your primary goal is to extract these 4 pieces of information.**
-Extract values directly from conversation. If the user says "Hi this is Priya", extract name: "Priya". Only enter the value, not the entire sentence.
-Only ask for one piece of missing information at a time. If you have extracted all 4 fields, your 'message' should confirm completion and offer a next step, like "Great! I have all your details. Is there anything else I can help with?" or "Thanks for providing all the information!". Do NOT ask for already collected information again in the message.
+**Current Form State:**
+${JSON.stringify(formData)}
 
-Always return JSON format:
+**Your Task & State Machine:**
+
+**1. Collecting State:**
+- If any of the four fields are empty in the 'Current Form State', you are in the 'Collecting' state.
+- Your goal is to ask for the *next single missing field* in the sequence.
+- Validate the user's input. If invalid (e.g., bad email), politely ask again for the same field.
+- Once you extract valid information, provide a brief confirmation with all fields you have and ask for the next field.
+
+**2. Reviewing State:**
+- **TRIGGER:** You enter this state ONLY when all four fields (name, email, linkedin, idea) are filled.
+- **ACTION:** Your 'message' MUST present a summary of all the collected data clearly. Use markdown for formatting. For example:
+  "Great, I have all your details! Please take a moment to review them:
+  - **Name**: Priya Sharma
+  - **Email**: priya.sharma@email.com
+  - **LinkedIn**: https://linkedin.com/in/priya-sharma
+  - **AI Idea**: An AI agent for automated unit test generation.
+  Does everything look correct? Or would you like to change anything?"
+- If the user wants to edit a field (e.g., "my email is wrong"), update the field in your 'updates' object and then **return to the Reviewing State** by presenting the updated summary again.
+
+**3. Submitting State:**
+- **TRIGGER:** You enter this state ONLY IF you are in the 'Reviewing State' AND the user confirms the details are correct (e.g., "looks good", "yes", "submit it").
+- **ACTION:**
+  - Your 'message' should be a final confirmation like "Perfect! Submitting your information now. Thank you!"
+  - Your JSON response MUST include the flag **"isSubmissionReady": true**.
+
+**Output Format:**
+Always return a valid JSON object.
 {
-  "message": "...", // The conversational reply
-  "updates": { // Only include updated fields here. If no new updates, this should be empty.
-    "name": "Priya",
-    "email": "priya@example.com",
-    "linkedin": "https://linkedin.com/in/priya",
-    "aiIdea": "A system for personalized learning paths"
-  }
+  "message": "...",
+  "updates": { "fieldName": "newValue" },
+  "isSubmissionReady": boolean // This MUST be true only in the Submitting State.
 }
-Always return valid JSON.`,
+`,
           },
         ],
       };
-
-
+    
     const model = genAI.getGenerativeModel({
-      model: 'models/gemini-2.5-flash-lite-preview-06-17',
+      model: 'gemini-2.5-flash-lite',
     });
 
     const result = await model.generateContent({
       contents: [systemInstruction, ...contents],
       generationConfig: {
-        temperature: 0.7,
-        responseMimeType: "application/json", // Still request strict JSON output
+        temperature: 0.5,
+        responseMimeType: "application/json",
       },
     });
 
     const rawReplyText = result.response.text();
-
-    // Reverting to robust parsing that handles both pure JSON and JSON wrapped in markdown
-    let jsonString = rawReplyText;
-    const jsonMatch = rawReplyText.match(/```json\n([\s\S]*?)\n```/);
-
-    if (jsonMatch && jsonMatch[1]) {
-      jsonString = jsonMatch[1];
-    } else {
-      // This warning will reappear, but it indicates the fallback is in use, which is necessary.
-      console.warn("Gemini response not wrapped in ```json``` (despite mimeType), attempting to parse as is:", rawReplyText);
-    }
-
-    let parsedData: ParsedLLMResponse = {
-      message: "An unexpected response was received from the AI.",
-      updates: {}
-    };
+    let parsedData: ParsedLLMResponse;
 
     try {
-      parsedData = JSON.parse(jsonString || '{}'); // Parse the potentially extracted string
-
-      if (!parsedData.message) {
-        parsedData.message = "AI response received, but message field was empty.";
-      }
-
-    } catch (parseError: any) {
-      console.error('❌ Failed to parse final JSON string:', jsonString, parseError);
-      parsedData.message = "I'm having trouble understanding the AI's format. Please try again.";
-      parsedData.updates = {};
+        parsedData = JSON.parse(rawReplyText);
+    } catch (parseError) {
+        console.error('❌ Failed to parse JSON from Gemini:', rawReplyText, parseError);
+        return NextResponse.json({
+            message: "I'm having a little trouble with my thoughts right now. Could you please rephrase that?",
+            updates: {},
+        });
     }
 
     return NextResponse.json({
-      message: parsedData.message,
+      message: parsedData.message || "...",
       updates: parsedData.updates || {},
+      isSubmissionReady: parsedData.isSubmissionReady || false,
     });
 
-  } catch (err: any) {
-    console.error('🔥 Gemini API or Server Error:', err.message || err);
 
+  } catch (err: any) {
+    console.error('🔥 Gemini API or Server Error:', err);
     return NextResponse.json(
       {
         error: err.message || 'Internal Server Error',
-        message: "Sorry, I'm having trouble connecting to the AI. Please try again in a moment!",
+        message: "Sorry, I'm having trouble connecting to the AI. Please try again in a moment.",
         updates: {},
       },
       { status: 500 }
