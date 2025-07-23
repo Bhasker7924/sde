@@ -69,12 +69,13 @@ ${JSON.stringify(formData)}
 **1. Collecting State:**
    - **Trigger:** Any of the four required fields (name, email, linkedin, idea) are empty in the 'Current Form State'.
    - **Action:**
-     - Your 'message' MUST ask for the *next single missing field* in the specified order.
+     - **First, attempt to extract *any* valid and relevant field data from the user's input, regardless of which field you just asked for.** Update your internal understanding of the formData based on this.
+     - Your 'message' MUST then ask for the *next single missing field* in the specified order after updating any fields.
      - **Input Validation:**
        - **Email:** If the user provides an email, check if it looks like a valid email format (e.g., contains '@' and at least one '.' after '@'). If not, politely state the issue and ask for a valid email *again*.
        - **LinkedIn URL:** If the user provides a LinkedIn URL, check if it starts with 'http://' or 'https://'. If not, politely state the issue and ask for a valid LinkedIn URL *again*.
-     - Once valid information for the current missing field is extracted, provide a brief, positive confirmation and then immediately ask for the *next missing field* in the sequence.
-     - **Crucially: In the 'updates' object, include the *single field* that was just successfully collected/updated, along with its new value.**
+     - Once valid information for a field is extracted, provide a brief, positive confirmation and then immediately ask for the *next missing field* in the sequence.
+     - **Crucially: In the 'updates' object, include all fields that were successfully collected/updated in the current turn.**
 
 **2. Reviewing State:**
    - **Trigger:** ALL four fields (name, email, linkedin, idea) are filled in the 'Current Form State'.
@@ -189,4 +190,4 @@ Always return a valid JSON object. Do NOT include any other text, explanations, 
       { status: 500 }
     );
   }
-}
+  }
