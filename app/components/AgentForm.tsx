@@ -18,11 +18,11 @@ export default function AgentForm() {
       // Simulate an API call for form submission
       await new Promise(resolve => setTimeout(resolve, 500)); // Shorten initial delay for quicker success display
 
-      setSubmissionStatus('success');
-      resetForm(); // Clear the form fields immediately
+      setSubmissionStatus('success'); // Display the success message immediately
 
-      // --- MODIFIED: Show success message for 2 seconds, then reload ---
+      // --- MODIFIED: Show success message for 2 seconds, then reset and reload ---
       setTimeout(() => {
+        resetForm(); // Clear the form fields AFTER the message has been visible
         window.location.reload(); // Refreshes the entire page
       }, 2000); // 2-second delay for the user to see the success message
 
